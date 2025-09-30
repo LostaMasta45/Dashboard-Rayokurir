@@ -32,6 +32,17 @@ export function KurirDashboard({ user }: KurirDashboardProps) {
     const [showCODModal, setShowCODModal] = useState(false);
     const [showPhotoModal, setShowPhotoModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [uploadedPhotos, setUploadedPhotos] = useState<
+        Array<{
+            id: string;
+            kurirId: string;
+            kurirName: string;
+            photoUrl: string;
+            description: string;
+            timestamp: string;
+            orderId?: string;
+        }>
+    >([]);
 
     useEffect(() => {
         const loadData = async () => {
@@ -39,7 +50,21 @@ export function KurirDashboard({ user }: KurirDashboardProps) {
             setOrders(data);
         };
         loadData();
+        // Load uploaded photos from localStorage
+        const savedPhotos = localStorage.getItem("courier_photos");
+        if (savedPhotos) {
+            setUploadedPhotos(JSON.parse(savedPhotos));
+        }
     }, []);
+
+    // Refresh uploaded photos after upload
+    const handlePhotoUploaded = () => {
+        setShowPhotoModal(false);
+        const savedPhotos = localStorage.getItem("courier_photos");
+        if (savedPhotos) {
+            setUploadedPhotos(JSON.parse(savedPhotos));
+        }
+    };
 
     // Filter orders for current courier
     const courierOrders = Array.isArray(orders)
@@ -223,6 +248,9 @@ export function KurirDashboard({ user }: KurirDashboardProps) {
         return statusOrder[a.status] - statusOrder[b.status];
     });
 
+    // Filter photos for this courier
+    const myPhotos = uploadedPhotos.filter((p) => p.kurirId === user.courierId);
+
     return (
         <div className="space-y-4 sm:space-y-6 p-4 sm:p-6 lg:p-0">
             {/* {debugInfo} */}
@@ -332,6 +360,47 @@ export function KurirDashboard({ user }: KurirDashboardProps) {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Foto Testimoni Kurir */}
+            {myPhotos.length > 0 && (
+                <div>
+                    <h2 className="text-lg sm:text-xl font-semibold mb-2">
+                        Foto Testimoni Anda
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {myPhotos.slice(0, 8).map((photo) => (
+                            <div
+                                key={photo.id}
+                                className="border rounded-lg p-3 space-y-2 hover:shadow-md transition-shadow"
+                            >
+                                <img
+                                    src={photo.photoUrl || "/placeholder.svg"}
+                                    alt="Testimoni kurir"
+                                    className="w-full h-32 sm:h-40 object-cover rounded-md"
+                                />
+                                <div className="space-y-1">
+                                    <p className="font-medium text-sm">
+                                        {photo.kurirName}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground line-clamp-2">
+                                        {photo.description}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {new Date(
+                                            photo.timestamp
+                                        ).toLocaleString("id-ID")}
+                                    </p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {myPhotos.length > 8 && (
+                        <p className="text-sm text-muted-foreground mt-4 text-center">
+                            Dan {myPhotos.length - 8} foto lainnya...
+                        </p>
+                    )}
+                </div>
+            )}
 
             {/* Orders Table */}
             <Card>
@@ -482,9 +551,7 @@ export function KurirDashboard({ user }: KurirDashboardProps) {
                 onClose={() => setShowPhotoModal(false)}
                 courierId={user.courierId!}
                 courierName={user.name}
-                onPhotoUploaded={() => {
-                    setShowPhotoModal(false);
-                }}
+                onPhotoUploaded={handlePhotoUploaded}
             />
         </div>
     );
