@@ -33,9 +33,12 @@ export function AdminDashboard() {
     useEffect(() => {
         (async () => {
             await loadData();
-            const savedPhotos = localStorage.getItem("courier_photos");
-            if (savedPhotos) {
-                setUploadedPhotos(JSON.parse(savedPhotos));
+            // Load uploaded photos metadata from Supabase DB
+            const { data: photos, error } = await supabase
+                .from('courier_photos')
+                .select('*');
+            if (!error && photos) {
+                setUploadedPhotos(photos);
             }
         })();
     }, []);

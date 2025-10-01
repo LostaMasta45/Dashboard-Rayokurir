@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { CourierCODDepositModal } from "@/components/courier-cod-deposit-modal";
 import { PhotoUploadModal } from "@/components/photo-upload-modal";
+
 import {
     getOrders,
     updateOrder,
@@ -22,6 +23,7 @@ import {
     type Order,
     type User,
 } from "@/lib/auth";
+import { supabase } from "@/lib/supabaseClient";
 
 interface KurirDashboardProps {
     user: User;
@@ -45,17 +47,33 @@ export function KurirDashboard({ user }: KurirDashboardProps) {
     >([]);
 
     useEffect(() => {
-        const loadData = async () => {
+        const loadAll = async () => {
             const data = await getOrders();
             setOrders(data);
+            // Load uploaded photos metadata from Supabase DB
+            const { data: photos, error } = await supabase
+                .from('courier_photos')
+                .select('*');
+            if (!error && photos) {
+                setUploadedPhotos(photos);
+            }
         };
-        loadData();
-        // Load uploaded photos from localStorage
-        const savedPhotos = localStorage.getItem("courier_photos");
-        if (savedPhotos) {
-            setUploadedPhotos(JSON.parse(savedPhotos));
-        }
+        loadAll();
     }, []);
+        useEffect(() => {
+            const loadAll = async () => {
+                const data = await getOrders();
+                setOrders(data);
+                // Load uploaded photos metadata from Supabase DB
+                const { data: photos, error } = await supabase
+                    .from('courier_photos')
+                    .select('*');
+                if (!error && photos) {
+                    setUploadedPhotos(photos);
+                }
+            };
+            loadAll();
+        }, []);
 
     // Refresh uploaded photos after upload
     const handlePhotoUploaded = () => {

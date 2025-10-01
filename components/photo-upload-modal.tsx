@@ -64,19 +64,19 @@ export function PhotoUploadModal({ isOpen, onClose, courierId, courierName, onPh
 
       const photoUrl = publicUrlData?.publicUrl || ""
 
-      // Save photo metadata to localStorage (for now, should be to DB in production)
+
+      // Save photo metadata to Supabase DB
       const photoData = {
         id: Date.now().toString(),
         kurirId: courierId,
         kurirName: courierName,
         photoUrl,
         description: description.trim(),
-        orderId: orderId.trim() || undefined,
+        orderId: orderId.trim() || null,
         timestamp: new Date().toISOString(),
       }
-      const existingPhotos = JSON.parse(localStorage.getItem("courier_photos") || "[]")
-      existingPhotos.push(photoData)
-      localStorage.setItem("courier_photos", JSON.stringify(existingPhotos))
+      const { error: dbError } = await supabase.from('courier_photos').insert([photoData]);
+      if (dbError) throw dbError;
 
       // Reset form
       setSelectedFile(null)

@@ -55,6 +55,18 @@ CREATE TABLE expenses (
   nominal INTEGER NOT NULL
 );
 
+
+-- Tabel courier_photos
+CREATE TABLE courier_photos (
+  id TEXT PRIMARY KEY,
+  kurirId TEXT NOT NULL,
+  kurirName TEXT NOT NULL,
+  photoUrl TEXT NOT NULL,
+  description TEXT,
+  orderId TEXT,
+  timestamp TEXT NOT NULL
+);
+
 -- Tabel contacts
 CREATE TABLE contacts (
   id TEXT PRIMARY KEY,
