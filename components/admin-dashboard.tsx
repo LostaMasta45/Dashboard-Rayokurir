@@ -196,9 +196,7 @@ export function AdminDashboard() {
                                     className="border rounded-lg p-3 space-y-2 hover:shadow-md transition-shadow"
                                 >
                                     <img
-                                        src={
-                                            photo.photoUrl || "/placeholder.svg"
-                                        }
+                                        src={photo.photoUrl || "/placeholder.svg"}
                                         alt="Testimoni kurir"
                                         className="w-full h-32 sm:h-40 object-cover rounded-md"
                                     />
@@ -210,9 +208,7 @@ export function AdminDashboard() {
                                             {photo.description}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            {new Date(
-                                                photo.timestamp
-                                            ).toLocaleString("id-ID")}
+                                            {new Date(photo.timestamp).toLocaleString("id-ID")}
                                         </p>
                                     </div>
                                 </div>

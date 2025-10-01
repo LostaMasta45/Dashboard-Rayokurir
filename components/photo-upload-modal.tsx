@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useRef } from "react"
+import { supabase } from "@/lib/supabaseClient"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -44,34 +45,47 @@ export function PhotoUploadModal({ isOpen, onClose, courierId, courierName, onPh
     setIsUploading(true)
 
     try {
-      // Convert file to base64 for localStorage storage
-      const reader = new FileReader()
-      reader.onload = () => {
-        const photoData = {
-          id: Date.now().toString(),
-          kurirId: courierId,
-          kurirName: courierName,
-          photoUrl: reader.result as string,
-          description: description.trim(),
-          orderId: orderId.trim() || undefined,
-          timestamp: new Date().toISOString(),
-        }
+      // Upload file to Supabase Storage
+      const fileExt = selectedFile.name.split('.').pop()
+      const fileName = `${courierId}_${Date.now()}.${fileExt}`
+      const { data, error } = await supabase.storage
+        .from('courier-photos')
+        .upload(fileName, selectedFile, {
+          cacheControl: '3600',
+          upsert: false,
+        })
 
-        // Save to localStorage
-        const existingPhotos = JSON.parse(localStorage.getItem("courier_photos") || "[]")
-        existingPhotos.push(photoData)
-        localStorage.setItem("courier_photos", JSON.stringify(existingPhotos))
+      if (error) throw error
 
-        // Reset form
-        setSelectedFile(null)
-        setPreviewUrl(null)
-        setDescription("")
-        setOrderId("")
-        setIsUploading(false)
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('courier-photos')
+        .getPublicUrl(fileName)
 
-        onPhotoUploaded()
+      const photoUrl = publicUrlData?.publicUrl || ""
+
+      // Save photo metadata to localStorage (for now, should be to DB in production)
+      const photoData = {
+        id: Date.now().toString(),
+        kurirId: courierId,
+        kurirName: courierName,
+        photoUrl,
+        description: description.trim(),
+        orderId: orderId.trim() || undefined,
+        timestamp: new Date().toISOString(),
       }
-      reader.readAsDataURL(selectedFile)
+      const existingPhotos = JSON.parse(localStorage.getItem("courier_photos") || "[]")
+      existingPhotos.push(photoData)
+      localStorage.setItem("courier_photos", JSON.stringify(existingPhotos))
+
+      // Reset form
+      setSelectedFile(null)
+      setPreviewUrl(null)
+      setDescription("")
+      setOrderId("")
+      setIsUploading(false)
+
+      onPhotoUploaded()
     } catch (error) {
       console.error("Error uploading photo:", error)
       setIsUploading(false)
