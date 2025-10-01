@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Package, CheckCircle, Clock, DollarSign } from "lucide-react";
 import { AddOrderModal } from "@/components/add-order-modal";
+
 import {
     getOrders,
     getCouriers,
@@ -13,6 +14,7 @@ import {
     type Order,
     type Courier,
 } from "@/lib/auth";
+import { supabase } from "@/lib/supabaseClient";
 
 export function AdminDashboard() {
     const [orders, setOrders] = useState<Order[]>([]);
@@ -35,8 +37,8 @@ export function AdminDashboard() {
             await loadData();
             // Load uploaded photos metadata from Supabase DB
             const { data: photos, error } = await supabase
-                .from('courier_photos')
-                .select('*');
+                .from("courier_photos")
+                .select("*");
             if (!error && photos) {
                 setUploadedPhotos(photos);
             }
@@ -199,7 +201,9 @@ export function AdminDashboard() {
                                     className="border rounded-lg p-3 space-y-2 hover:shadow-md transition-shadow"
                                 >
                                     <img
-                                        src={photo.photoUrl || "/placeholder.svg"}
+                                        src={
+                                            photo.photoUrl || "/placeholder.svg"
+                                        }
                                         alt="Testimoni kurir"
                                         className="w-full h-32 sm:h-40 object-cover rounded-md"
                                     />
@@ -211,7 +215,9 @@ export function AdminDashboard() {
                                             {photo.description}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            {new Date(photo.timestamp).toLocaleString("id-ID")}
+                                            {new Date(
+                                                photo.timestamp
+                                            ).toLocaleString("id-ID")}
                                         </p>
                                     </div>
                                 </div>

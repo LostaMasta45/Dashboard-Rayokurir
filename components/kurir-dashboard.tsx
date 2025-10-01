@@ -52,28 +52,28 @@ export function KurirDashboard({ user }: KurirDashboardProps) {
             setOrders(data);
             // Load uploaded photos metadata from Supabase DB
             const { data: photos, error } = await supabase
-                .from('courier_photos')
-                .select('*');
+                .from("courier_photos")
+                .select("*");
             if (!error && photos) {
                 setUploadedPhotos(photos);
             }
         };
         loadAll();
     }, []);
-        useEffect(() => {
-            const loadAll = async () => {
-                const data = await getOrders();
-                setOrders(data);
-                // Load uploaded photos metadata from Supabase DB
-                const { data: photos, error } = await supabase
-                    .from('courier_photos')
-                    .select('*');
-                if (!error && photos) {
-                    setUploadedPhotos(photos);
-                }
-            };
-            loadAll();
-        }, []);
+    useEffect(() => {
+        const loadAll = async () => {
+            const data = await getOrders();
+            setOrders(data);
+            // Load uploaded photos metadata from Supabase DB
+            const { data: photos, error } = await supabase
+                .from("courier_photos")
+                .select("*");
+            if (!error && photos) {
+                setUploadedPhotos(photos);
+            }
+        };
+        loadAll();
+    }, []);
 
     // Refresh uploaded photos after upload
     const handlePhotoUploaded = () => {
