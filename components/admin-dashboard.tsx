@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,11 +72,11 @@ export function AdminDashboard() {
 
     const getStatusBadge = (status: Order["status"]) => {
         switch (status) {
-            case "MENUNGGU":
-                return <Badge variant="secondary">Menunggu</Badge>;
-            case "OTW":
+            case "BARU":
+                return <Badge variant="secondary">BARU</Badge>;
+            case "ASSIGNED":
                 return (
-                    <Badge className="bg-blue-500 hover:bg-blue-600">OTW</Badge>
+                    <Badge className="bg-blue-500 hover:bg-blue-600">ASSIGNED</Badge>
                 );
             case "SELESAI":
                 return (
@@ -99,7 +99,7 @@ export function AdminDashboard() {
         <div className="space-y-4 sm:space-y-6 p-4 sm:p-6 lg:p-0">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-rayo-dark">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-rayo-dark dark:text-rayo-light">
                         Dashboard
                     </h1>
                     <p className="text-sm sm:text-base text-muted-foreground">
@@ -125,7 +125,7 @@ export function AdminDashboard() {
                         <Package className="h-3 w-3 sm:h-4 sm:w-4 text-rayo-primary flex-shrink-0" />
                     </CardHeader>
                     <CardContent className="p-0 pt-2">
-                        <div className="text-lg sm:text-2xl font-bold text-rayo-dark">
+                        <div className="text-lg sm:text-2xl font-bold text-rayo-dark dark:text-rayo-light">
                             {stats.totalToday}
                         </div>
                         <p className="text-xs text-muted-foreground">
@@ -163,7 +163,7 @@ export function AdminDashboard() {
                             {stats.pending}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            Menunggu & OTW
+                            BARU & ASSIGNED
                         </p>
                     </CardContent>
                 </Card>
@@ -320,12 +320,11 @@ export function AdminDashboard() {
                                                             )}
                                                         </div>
                                                         <div
-                                                            className={`text-xs ${
-                                                                order.cod
+                                                            className={`text-xs ${order.cod
                                                                     .codPaid
                                                                     ? "text-green-600"
                                                                     : "text-red-600"
-                                                            }`}
+                                                                }`}
                                                         >
                                                             {order.cod.codPaid
                                                                 ? "Lunas"
@@ -358,3 +357,4 @@ export function AdminDashboard() {
         </div>
     );
 }
+

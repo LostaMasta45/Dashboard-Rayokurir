@@ -37,11 +37,11 @@ export interface Order {
     };
     kurirId: string | null;
     status:
-        | "MENUNGGU_PICKUP"
-        | "PICKUP_OTW"
-        | "BARANG_DIAMBIL"
-        | "SEDANG_DIKIRIM"
-        | "SELESAI";
+    | "BARU"
+    | "ASSIGNED"
+    | "PICKUP"
+    | "DIKIRIM"
+    | "SELESAI";
     jenisOrder: "Barang" | "Makanan" | "Dokumen" | "Antar Jemput";
     serviceType: "Reguler" | "Express" | "Same Day";
     ongkir: number;
@@ -91,6 +91,37 @@ export interface Contact {
     notes?: string;
     createdAt: string;
     lastContacted?: string;
+}
+
+export interface Mitra {
+    id: string;
+    nama: string;
+    deskripsi?: string;
+    kategori: string[];
+    logo?: string;
+    cover?: string;
+    lokasi?: string;
+    waktuAntar?: string;
+    rating: number;
+    jumlahReview: number;
+    sedangBuka: boolean;
+    whatsapp?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface MenuItem {
+    id: string;
+    mitraId: string;
+    nama: string;
+    deskripsi?: string;
+    harga: number;
+    gambar?: string;
+    kategoriMenu?: string;
+    terlaris: boolean;
+    tersedia: boolean;
+    createdAt: string;
+    updatedAt: string;
 }
 
 import { supabase } from "./supabaseClient";
@@ -242,6 +273,35 @@ export async function updateOrder(order: Order): Promise<Order | null> {
         .select()
         .single();
     return data || null;
+}
+
+export async function deleteOrder(orderId: string): Promise<boolean> {
+    const { error } = await supabase
+        .from("orders")
+        .delete()
+        .eq("id", orderId);
+
+    if (error) {
+        console.error("[deleteOrder] Supabase error:", error);
+        return false;
+    }
+    return true;
+}
+
+export async function saveOrders(orders: Order[]): Promise<Order[] | null> {
+    if (!orders || orders.length === 0) return [];
+
+    // Use upsert for bulk save/updates
+    const { data, error } = await supabase
+        .from("orders")
+        .upsert(orders)
+        .select();
+
+    if (error) {
+        console.error("[saveOrders] Supabase error:", error);
+        return null;
+    }
+    return data || [];
 }
 
 export async function getCouriers(): Promise<Courier[]> {
@@ -430,10 +490,9 @@ export function exportContactsToCSV(contacts: Contact[]) {
                 `"${contact.tags.join("; ")}"`,
                 `"${contact.notes || ""}"`,
                 `"${formatDate(contact.createdAt)}"`,
-                `"${
-                    contact.lastContacted
-                        ? formatDate(contact.lastContacted)
-                        : ""
+                `"${contact.lastContacted
+                    ? formatDate(contact.lastContacted)
+                    : ""
                 }"`,
             ].join(",")
         ),
@@ -486,16 +545,19 @@ export const SERVICE_TYPE_PRICING = {
 
 // Status badge configuration with colors
 export const ORDER_STATUS_CONFIG = {
-    MENUNGGU_PICKUP: {
-        label: "Menunggu Pickup",
+    BARU: {
+        label: "Menunggu Kurir",
         color: "bg-gray-100 text-gray-800",
     },
-    PICKUP_OTW: { label: "Pickup OTW", color: "bg-blue-100 text-blue-800" },
-    BARANG_DIAMBIL: {
-        label: "Barang Diambil",
-        color: "bg-yellow-100 text-yellow-800",
+    ASSIGNED: {
+        label: "Kurir Ditugaskan",
+        color: "bg-blue-100 text-blue-800",
     },
-    SEDANG_DIKIRIM: {
+    PICKUP: {
+        label: "Barang Diambil",
+        color: "bg-amber-100 text-amber-800",
+    },
+    DIKIRIM: {
         label: "Sedang Dikirim",
         color: "bg-orange-100 text-orange-800",
     },
@@ -560,10 +622,10 @@ export async function updateOrderStatus(
         Order["status"],
         Order["status"][]
     > = {
-        MENUNGGU_PICKUP: ["PICKUP_OTW"],
-        PICKUP_OTW: ["BARANG_DIAMBIL"],
-        BARANG_DIAMBIL: ["SEDANG_DIKIRIM"],
-        SEDANG_DIKIRIM: ["SELESAI"],
+        BARU: [],  // Kurir cannot change from BARU
+        ASSIGNED: ["PICKUP"],
+        PICKUP: ["DIKIRIM"],
+        DIKIRIM: ["SELESAI"],
         SELESAI: [],
     };
     // Check if courier can make this transition
@@ -577,4 +639,297 @@ export async function updateOrderStatus(
     // Admin can override any status
     await updateOrder({ ...order, status: newStatus });
     return true;
+}
+
+// ==================== MITRA CRUD FUNCTIONS ====================
+
+export async function getMitra(): Promise<Mitra[]> {
+    const { data, error } = await supabase
+        .from("mitra")
+        .select("*")
+        .order("createdAt", { ascending: false });
+    if (error) {
+        console.error("[getMitra] Supabase error:", error);
+        return [];
+    }
+    return data || [];
+}
+
+export async function getMitraById(id: string): Promise<Mitra | null> {
+    const { data, error } = await supabase
+        .from("mitra")
+        .select("*")
+        .eq("id", id)
+        .single();
+    if (error) {
+        console.error("[getMitraById] Supabase error:", error);
+        return null;
+    }
+    return data || null;
+}
+
+export async function saveMitra(mitra: Mitra): Promise<Mitra | null> {
+    const { data, error } = await supabase
+        .from("mitra")
+        .insert([mitra])
+        .select()
+        .single();
+    if (error) {
+        console.error("[saveMitra] Supabase error:", error, mitra);
+        return null;
+    }
+    return data || null;
+}
+
+export async function updateMitra(mitra: Mitra): Promise<Mitra | null> {
+    const { data, error } = await supabase
+        .from("mitra")
+        .update({ ...mitra, updatedAt: new Date().toISOString() })
+        .eq("id", mitra.id)
+        .select()
+        .single();
+    if (error) {
+        console.error("[updateMitra] Supabase error:", error);
+        return null;
+    }
+    return data || null;
+}
+
+export async function deleteMitra(mitraId: string): Promise<boolean> {
+    const { error } = await supabase
+        .from("mitra")
+        .delete()
+        .eq("id", mitraId);
+    if (error) {
+        console.error("[deleteMitra] Supabase error:", error);
+        return false;
+    }
+    return true;
+}
+
+export async function toggleMitraStatus(mitraId: string): Promise<Mitra | null> {
+    const mitra = await getMitraById(mitraId);
+    if (!mitra) return null;
+    return await updateMitra({ ...mitra, sedangBuka: !mitra.sedangBuka });
+}
+
+// ==================== MENU ITEM CRUD FUNCTIONS ====================
+
+export async function getMenuItems(mitraId?: string): Promise<MenuItem[]> {
+    let query = supabase.from("menu_items").select("*");
+    if (mitraId) {
+        query = query.eq("mitraId", mitraId);
+    }
+    const { data, error } = await query.order("createdAt", { ascending: false });
+    if (error) {
+        console.error("[getMenuItems] Supabase error:", error);
+        return [];
+    }
+    return data || [];
+}
+
+export async function getMenuItemById(id: string): Promise<MenuItem | null> {
+    const { data, error } = await supabase
+        .from("menu_items")
+        .select("*")
+        .eq("id", id)
+        .single();
+    if (error) {
+        console.error("[getMenuItemById] Supabase error:", error);
+        return null;
+    }
+    return data || null;
+}
+
+export async function saveMenuItem(menuItem: MenuItem): Promise<MenuItem | null> {
+    const { data, error } = await supabase
+        .from("menu_items")
+        .insert([menuItem])
+        .select()
+        .single();
+    if (error) {
+        console.error("[saveMenuItem] Supabase error:", error, menuItem);
+        return null;
+    }
+    return data || null;
+}
+
+export async function updateMenuItem(menuItem: MenuItem): Promise<MenuItem | null> {
+    const { data, error } = await supabase
+        .from("menu_items")
+        .update({ ...menuItem, updatedAt: new Date().toISOString() })
+        .eq("id", menuItem.id)
+        .select()
+        .single();
+    if (error) {
+        console.error("[updateMenuItem] Supabase error:", error);
+        return null;
+    }
+    return data || null;
+}
+
+export async function deleteMenuItem(menuItemId: string): Promise<boolean> {
+    const { error } = await supabase
+        .from("menu_items")
+        .delete()
+        .eq("id", menuItemId);
+    if (error) {
+        console.error("[deleteMenuItem] Supabase error:", error);
+        return false;
+    }
+    return true;
+}
+
+export async function toggleMenuItemTerlaris(menuItemId: string): Promise<MenuItem | null> {
+    const menuItem = await getMenuItemById(menuItemId);
+    if (!menuItem) return null;
+    return await updateMenuItem({ ...menuItem, terlaris: !menuItem.terlaris });
+}
+
+export async function toggleMenuItemTersedia(menuItemId: string): Promise<MenuItem | null> {
+    const menuItem = await getMenuItemById(menuItemId);
+    if (!menuItem) return null;
+    return await updateMenuItem({ ...menuItem, tersedia: !menuItem.tersedia });
+}
+
+// ==================== MITRA CATEGORIES ====================
+
+export const MITRA_CATEGORIES = [
+    { id: "makanan", label: "Makanan", icon: "🍜" },
+    { id: "minuman", label: "Minuman", icon: "🥤" },
+    { id: "retail", label: "Retail", icon: "🛒" },
+    { id: "toko", label: "Toko", icon: "🏪" },
+];
+
+// ==================== SEED MITRA DATA ====================
+
+export async function seedMitraData() {
+    const { data: existingMitra } = await supabase.from("mitra").select("id");
+    if (existingMitra && existingMitra.length > 0) {
+        console.log("[seedMitraData] Mitra data already exists, skipping seed");
+        return;
+    }
+
+    const now = new Date().toISOString();
+    const mitraData: Mitra[] = [
+        // KATEGORI MAKANAN (6 mitra)
+        { id: "m1", nama: "Warung Bu Yanti", deskripsi: "Masakan rumahan Jawa Timur", kategori: ["makanan"], logo: "https://picsum.photos/seed/m1logo/200", cover: "https://picsum.photos/seed/m1cover/800/400", lokasi: "Sumobito, Jombang", waktuAntar: "15-25 menit", rating: 4.8, jumlahReview: 120, sedangBuka: true, whatsapp: "6281234567001", createdAt: now, updatedAt: now },
+        { id: "m2", nama: "Geprek Mantap", deskripsi: "Ayam geprek berbagai level", kategori: ["makanan"], logo: "https://picsum.photos/seed/m2logo/200", cover: "https://picsum.photos/seed/m2cover/800/400", lokasi: "Pasar Sumobito", waktuAntar: "10-20 menit", rating: 4.6, jumlahReview: 89, sedangBuka: true, whatsapp: "6281234567002", createdAt: now, updatedAt: now },
+        { id: "m3", nama: "Bakso Pak Budi", deskripsi: "Bakso urat dan bakso halus", kategori: ["makanan"], logo: "https://picsum.photos/seed/m3logo/200", cover: "https://picsum.photos/seed/m3cover/800/400", lokasi: "Jl. Raya Sumobito", waktuAntar: "15-25 menit", rating: 4.7, jumlahReview: 150, sedangBuka: true, whatsapp: "6281234567003", createdAt: now, updatedAt: now },
+        { id: "m4", nama: "Mie Ayam Cak Nur", deskripsi: "Mie ayam dan pangsit", kategori: ["makanan"], logo: "https://picsum.photos/seed/m4logo/200", cover: "https://picsum.photos/seed/m4cover/800/400", lokasi: "Perumahan Griya", waktuAntar: "10-15 menit", rating: 4.5, jumlahReview: 75, sedangBuka: true, whatsapp: "6281234567004", createdAt: now, updatedAt: now },
+        { id: "m5", nama: "Sate Kambing Madura", deskripsi: "Sate kambing asli Madura", kategori: ["makanan"], logo: "https://picsum.photos/seed/m5logo/200", cover: "https://picsum.photos/seed/m5cover/800/400", lokasi: "Depan Masjid Agung", waktuAntar: "20-30 menit", rating: 4.9, jumlahReview: 200, sedangBuka: false, whatsapp: "6281234567005", createdAt: now, updatedAt: now },
+        { id: "m6", nama: "Nasi Goreng Jaya", deskripsi: "Nasi goreng seafood spesial", kategori: ["makanan"], logo: "https://picsum.photos/seed/m6logo/200", cover: "https://picsum.photos/seed/m6cover/800/400", lokasi: "Jl. Pahlawan", waktuAntar: "15-20 menit", rating: 4.4, jumlahReview: 60, sedangBuka: true, whatsapp: "6281234567006", createdAt: now, updatedAt: now },
+
+        // KATEGORI MINUMAN (6 mitra)
+        { id: "m7", nama: "Kopi Nusantara", deskripsi: "Kopi dan minuman kekinian", kategori: ["minuman"], logo: "https://picsum.photos/seed/m7logo/200", cover: "https://picsum.photos/seed/m7cover/800/400", lokasi: "Ruko Sumobito", waktuAntar: "10-15 menit", rating: 4.8, jumlahReview: 180, sedangBuka: true, whatsapp: "6281234567007", createdAt: now, updatedAt: now },
+        { id: "m8", nama: "Es Dawet Pak Rohmat", deskripsi: "Minuman tradisional Jawa", kategori: ["minuman"], logo: "https://picsum.photos/seed/m8logo/200", cover: "https://picsum.photos/seed/m8cover/800/400", lokasi: "Depan SD 1", waktuAntar: "15-20 menit", rating: 4.7, jumlahReview: 140, sedangBuka: true, whatsapp: "6281234567008", createdAt: now, updatedAt: now },
+        { id: "m9", nama: "Boba Queen", deskripsi: "Boba dan milk tea", kategori: ["minuman"], logo: "https://picsum.photos/seed/m9logo/200", cover: "https://picsum.photos/seed/m9cover/800/400", lokasi: "Mall Sumobito", waktuAntar: "10-15 menit", rating: 4.6, jumlahReview: 95, sedangBuka: true, whatsapp: "6281234567009", createdAt: now, updatedAt: now },
+        { id: "m10", nama: "Juice Fresh", deskripsi: "Jus buah segar", kategori: ["minuman"], logo: "https://picsum.photos/seed/m10logo/200", cover: "https://picsum.photos/seed/m10cover/800/400", lokasi: "Pasar Buah", waktuAntar: "10-20 menit", rating: 4.5, jumlahReview: 70, sedangBuka: true, whatsapp: "6281234567010", createdAt: now, updatedAt: now },
+        { id: "m11", nama: "Thai Tea Corner", deskripsi: "Thai tea dan minuman thai", kategori: ["minuman"], logo: "https://picsum.photos/seed/m11logo/200", cover: "https://picsum.photos/seed/m11cover/800/400", lokasi: "Jl. Merdeka", waktuAntar: "15-25 menit", rating: 4.4, jumlahReview: 55, sedangBuka: false, whatsapp: "6281234567011", createdAt: now, updatedAt: now },
+        { id: "m12", nama: "Smoothie Bar", deskripsi: "Smoothie dan shake sehat", kategori: ["minuman"], logo: "https://picsum.photos/seed/m12logo/200", cover: "https://picsum.photos/seed/m12cover/800/400", lokasi: "GYM Center", waktuAntar: "10-15 menit", rating: 4.3, jumlahReview: 40, sedangBuka: true, whatsapp: "6281234567012", createdAt: now, updatedAt: now },
+
+        // KATEGORI RETAIL (6 mitra)
+        { id: "m13", nama: "Frozen Mart", deskripsi: "Frozen food lengkap", kategori: ["retail"], logo: "https://picsum.photos/seed/m13logo/200", cover: "https://picsum.photos/seed/m13cover/800/400", lokasi: "Ruko Niaga", waktuAntar: "20-30 menit", rating: 4.7, jumlahReview: 110, sedangBuka: true, whatsapp: "6281234567013", createdAt: now, updatedAt: now },
+        { id: "m14", nama: "Snack Corner", deskripsi: "Aneka snack dan cemilan", kategori: ["retail"], logo: "https://picsum.photos/seed/m14logo/200", cover: "https://picsum.photos/seed/m14cover/800/400", lokasi: "Terminal Bus", waktuAntar: "15-25 menit", rating: 4.5, jumlahReview: 85, sedangBuka: true, whatsapp: "6281234567014", createdAt: now, updatedAt: now },
+        { id: "m15", nama: "Bumbu Dapur", deskripsi: "Bumbu masak dan rempah", kategori: ["retail"], logo: "https://picsum.photos/seed/m15logo/200", cover: "https://picsum.photos/seed/m15cover/800/400", lokasi: "Pasar Tradisional", waktuAntar: "20-30 menit", rating: 4.6, jumlahReview: 90, sedangBuka: true, whatsapp: "6281234567015", createdAt: now, updatedAt: now },
+        { id: "m16", nama: "Sembako Murah", deskripsi: "Beras, gula, minyak dll", kategori: ["retail"], logo: "https://picsum.photos/seed/m16logo/200", cover: "https://picsum.photos/seed/m16cover/800/400", lokasi: "Jl. Pasar Baru", waktuAntar: "25-35 menit", rating: 4.4, jumlahReview: 65, sedangBuka: true, whatsapp: "6281234567016", createdAt: now, updatedAt: now },
+        { id: "m17", nama: "Baby Shop", deskripsi: "Perlengkapan bayi", kategori: ["retail"], logo: "https://picsum.photos/seed/m17logo/200", cover: "https://picsum.photos/seed/m17cover/800/400", lokasi: "Ruko Baru", waktuAntar: "20-30 menit", rating: 4.8, jumlahReview: 130, sedangBuka: false, whatsapp: "6281234567017", createdAt: now, updatedAt: now },
+        { id: "m18", nama: "Kosmetik Cantik", deskripsi: "Kosmetik dan skincare", kategori: ["retail"], logo: "https://picsum.photos/seed/m18logo/200", cover: "https://picsum.photos/seed/m18cover/800/400", lokasi: "Mall Sumobito", waktuAntar: "15-25 menit", rating: 4.5, jumlahReview: 75, sedangBuka: true, whatsapp: "6281234567018", createdAt: now, updatedAt: now },
+
+        // KATEGORI TOKO (6 mitra)
+        { id: "m19", nama: "Elektronik Jaya", deskripsi: "Elektronik dan gadget", kategori: ["toko"], logo: "https://picsum.photos/seed/m19logo/200", cover: "https://picsum.photos/seed/m19cover/800/400", lokasi: "Jl. Raya Utama", waktuAntar: "30-45 menit", rating: 4.6, jumlahReview: 100, sedangBuka: true, whatsapp: "6281234567019", createdAt: now, updatedAt: now },
+        { id: "m20", nama: "ATK Lengkap", deskripsi: "Alat tulis dan kantor", kategori: ["toko"], logo: "https://picsum.photos/seed/m20logo/200", cover: "https://picsum.photos/seed/m20cover/800/400", lokasi: "Depan Sekolah", waktuAntar: "15-25 menit", rating: 4.7, jumlahReview: 120, sedangBuka: true, whatsapp: "6281234567020", createdAt: now, updatedAt: now },
+        { id: "m21", nama: "Toko Bangunan", deskripsi: "Material bangunan", kategori: ["toko"], logo: "https://picsum.photos/seed/m21logo/200", cover: "https://picsum.photos/seed/m21cover/800/400", lokasi: "Jl. Industri", waktuAntar: "45-60 menit", rating: 4.4, jumlahReview: 50, sedangBuka: true, whatsapp: "6281234567021", createdAt: now, updatedAt: now },
+        { id: "m22", nama: "Pet Shop Sayang", deskripsi: "Makanan dan aksesoris hewan", kategori: ["toko"], logo: "https://picsum.photos/seed/m22logo/200", cover: "https://picsum.photos/seed/m22cover/800/400", lokasi: "Perumahan Elite", waktuAntar: "20-30 menit", rating: 4.8, jumlahReview: 95, sedangBuka: true, whatsapp: "6281234567022", createdAt: now, updatedAt: now },
+        { id: "m23", nama: "Toko Mainan", deskripsi: "Mainan anak lengkap", kategori: ["toko"], logo: "https://picsum.photos/seed/m23logo/200", cover: "https://picsum.photos/seed/m23cover/800/400", lokasi: "Mall Sumobito", waktuAntar: "20-30 menit", rating: 4.5, jumlahReview: 80, sedangBuka: false, whatsapp: "6281234567023", createdAt: now, updatedAt: now },
+        { id: "m24", nama: "Toko Olahraga", deskripsi: "Peralatan olahraga", kategori: ["toko"], logo: "https://picsum.photos/seed/m24logo/200", cover: "https://picsum.photos/seed/m24cover/800/400", lokasi: "Stadion", waktuAntar: "25-35 menit", rating: 4.6, jumlahReview: 70, sedangBuka: true, whatsapp: "6281234567024", createdAt: now, updatedAt: now },
+    ];
+
+    const { error: mitraError } = await supabase.from("mitra").insert(mitraData);
+    if (mitraError) { console.error("[seedMitraData] Error:", mitraError); return; }
+
+    // Menu items - 3 items per mitra
+    const menuData: MenuItem[] = [
+        // Makanan
+        { id: "mn1", mitraId: "m1", nama: "Nasi Pecel", harga: 15000, gambar: "https://picsum.photos/seed/mn1/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn2", mitraId: "m1", nama: "Nasi Rawon", harga: 18000, gambar: "https://picsum.photos/seed/mn2/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn3", mitraId: "m1", nama: "Soto Ayam", harga: 12000, gambar: "https://picsum.photos/seed/mn3/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn4", mitraId: "m2", nama: "Geprek Original", harga: 15000, gambar: "https://picsum.photos/seed/mn4/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn5", mitraId: "m2", nama: "Geprek Mozza", harga: 22000, gambar: "https://picsum.photos/seed/mn5/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn6", mitraId: "m2", nama: "Geprek Sambal Matah", harga: 18000, gambar: "https://picsum.photos/seed/mn6/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn7", mitraId: "m3", nama: "Bakso Urat", harga: 15000, gambar: "https://picsum.photos/seed/mn7/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn8", mitraId: "m3", nama: "Bakso Halus", harga: 12000, gambar: "https://picsum.photos/seed/mn8/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn9", mitraId: "m3", nama: "Mie Ayam Bakso", harga: 15000, gambar: "https://picsum.photos/seed/mn9/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn10", mitraId: "m4", nama: "Mie Ayam Biasa", harga: 12000, gambar: "https://picsum.photos/seed/mn10/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn11", mitraId: "m4", nama: "Mie Ayam Pangsit", harga: 15000, gambar: "https://picsum.photos/seed/mn11/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn12", mitraId: "m4", nama: "Pangsit Goreng", harga: 8000, gambar: "https://picsum.photos/seed/mn12/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn13", mitraId: "m5", nama: "Sate Kambing 10pcs", harga: 35000, gambar: "https://picsum.photos/seed/mn13/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn14", mitraId: "m5", nama: "Gulai Kambing", harga: 30000, gambar: "https://picsum.photos/seed/mn14/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn15", mitraId: "m5", nama: "Tongseng Kambing", harga: 28000, gambar: "https://picsum.photos/seed/mn15/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn16", mitraId: "m6", nama: "Nasi Goreng Seafood", harga: 20000, gambar: "https://picsum.photos/seed/mn16/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn17", mitraId: "m6", nama: "Nasi Goreng Kampung", harga: 15000, gambar: "https://picsum.photos/seed/mn17/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn18", mitraId: "m6", nama: "Mie Goreng Spesial", harga: 18000, gambar: "https://picsum.photos/seed/mn18/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        // Minuman
+        { id: "mn19", mitraId: "m7", nama: "Es Kopi Susu", harga: 15000, gambar: "https://picsum.photos/seed/mn19/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn20", mitraId: "m7", nama: "Americano", harga: 12000, gambar: "https://picsum.photos/seed/mn20/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn21", mitraId: "m7", nama: "Matcha Latte", harga: 18000, gambar: "https://picsum.photos/seed/mn21/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn22", mitraId: "m8", nama: "Es Dawet", harga: 8000, gambar: "https://picsum.photos/seed/mn22/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn23", mitraId: "m8", nama: "Es Cendol", harga: 10000, gambar: "https://picsum.photos/seed/mn23/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn24", mitraId: "m8", nama: "Es Campur", harga: 12000, gambar: "https://picsum.photos/seed/mn24/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn25", mitraId: "m9", nama: "Brown Sugar Boba", harga: 18000, gambar: "https://picsum.photos/seed/mn25/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn26", mitraId: "m9", nama: "Taro Milk Tea", harga: 15000, gambar: "https://picsum.photos/seed/mn26/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn27", mitraId: "m9", nama: "Thai Green Tea", harga: 15000, gambar: "https://picsum.photos/seed/mn27/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn28", mitraId: "m10", nama: "Jus Alpukat", harga: 12000, gambar: "https://picsum.photos/seed/mn28/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn29", mitraId: "m10", nama: "Jus Mangga", harga: 10000, gambar: "https://picsum.photos/seed/mn29/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn30", mitraId: "m10", nama: "Jus Jeruk", harga: 8000, gambar: "https://picsum.photos/seed/mn30/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn31", mitraId: "m11", nama: "Thai Tea Original", harga: 12000, gambar: "https://picsum.photos/seed/mn31/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn32", mitraId: "m11", nama: "Thai Green Tea", harga: 12000, gambar: "https://picsum.photos/seed/mn32/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn33", mitraId: "m11", nama: "Thai Coffee", harga: 15000, gambar: "https://picsum.photos/seed/mn33/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn34", mitraId: "m12", nama: "Berry Smoothie", harga: 20000, gambar: "https://picsum.photos/seed/mn34/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn35", mitraId: "m12", nama: "Green Smoothie", harga: 18000, gambar: "https://picsum.photos/seed/mn35/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn36", mitraId: "m12", nama: "Protein Shake", harga: 25000, gambar: "https://picsum.photos/seed/mn36/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        // Retail
+        { id: "mn37", mitraId: "m13", nama: "Dimsum 10pcs", harga: 25000, gambar: "https://picsum.photos/seed/mn37/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn38", mitraId: "m13", nama: "Nugget 500g", harga: 35000, gambar: "https://picsum.photos/seed/mn38/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn39", mitraId: "m13", nama: "Sosis Sapi 1kg", harga: 45000, gambar: "https://picsum.photos/seed/mn39/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn40", mitraId: "m14", nama: "Keripik Singkong", harga: 15000, gambar: "https://picsum.photos/seed/mn40/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn41", mitraId: "m14", nama: "Kacang Atom", harga: 12000, gambar: "https://picsum.photos/seed/mn41/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn42", mitraId: "m14", nama: "Rempeyek Kacang", harga: 20000, gambar: "https://picsum.photos/seed/mn42/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn43", mitraId: "m15", nama: "Bumbu Rendang", harga: 15000, gambar: "https://picsum.photos/seed/mn43/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn44", mitraId: "m15", nama: "Bumbu Opor", harga: 12000, gambar: "https://picsum.photos/seed/mn44/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn45", mitraId: "m15", nama: "Santan 1L", harga: 18000, gambar: "https://picsum.photos/seed/mn45/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn46", mitraId: "m16", nama: "Beras 5kg", harga: 65000, gambar: "https://picsum.photos/seed/mn46/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn47", mitraId: "m16", nama: "Gula 1kg", harga: 15000, gambar: "https://picsum.photos/seed/mn47/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn48", mitraId: "m16", nama: "Minyak 2L", harga: 35000, gambar: "https://picsum.photos/seed/mn48/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn49", mitraId: "m17", nama: "Popok Bayi M", harga: 85000, gambar: "https://picsum.photos/seed/mn49/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn50", mitraId: "m17", nama: "Susu Formula", harga: 120000, gambar: "https://picsum.photos/seed/mn50/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn51", mitraId: "m17", nama: "Baby Wipes", harga: 25000, gambar: "https://picsum.photos/seed/mn51/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn52", mitraId: "m18", nama: "Sunscreen SPF50", harga: 75000, gambar: "https://picsum.photos/seed/mn52/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn53", mitraId: "m18", nama: "Lip Tint", harga: 45000, gambar: "https://picsum.photos/seed/mn53/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn54", mitraId: "m18", nama: "Serum Vitamin C", harga: 95000, gambar: "https://picsum.photos/seed/mn54/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        // Toko
+        { id: "mn55", mitraId: "m19", nama: "Charger Fast 20W", harga: 85000, gambar: "https://picsum.photos/seed/mn55/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn56", mitraId: "m19", nama: "Earphone Bluetooth", harga: 150000, gambar: "https://picsum.photos/seed/mn56/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn57", mitraId: "m19", nama: "Power Bank 10000", harga: 180000, gambar: "https://picsum.photos/seed/mn57/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn58", mitraId: "m20", nama: "Buku Tulis 10pcs", harga: 25000, gambar: "https://picsum.photos/seed/mn58/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn59", mitraId: "m20", nama: "Pensil 2B 12pcs", harga: 15000, gambar: "https://picsum.photos/seed/mn59/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn60", mitraId: "m20", nama: "Penghapus Set", harga: 8000, gambar: "https://picsum.photos/seed/mn60/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn61", mitraId: "m21", nama: "Cat Tembok 5kg", harga: 150000, gambar: "https://picsum.photos/seed/mn61/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn62", mitraId: "m21", nama: "Semen 50kg", harga: 65000, gambar: "https://picsum.photos/seed/mn62/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn63", mitraId: "m21", nama: "Paku 1kg", harga: 25000, gambar: "https://picsum.photos/seed/mn63/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn64", mitraId: "m22", nama: "Makanan Kucing 1kg", harga: 45000, gambar: "https://picsum.photos/seed/mn64/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn65", mitraId: "m22", nama: "Pasir Kucing 5L", harga: 35000, gambar: "https://picsum.photos/seed/mn65/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn66", mitraId: "m22", nama: "Mainan Kucing", harga: 25000, gambar: "https://picsum.photos/seed/mn66/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn67", mitraId: "m23", nama: "Lego Set", harga: 150000, gambar: "https://picsum.photos/seed/mn67/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn68", mitraId: "m23", nama: "Boneka Bear", harga: 85000, gambar: "https://picsum.photos/seed/mn68/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn69", mitraId: "m23", nama: "Mobil Remote", harga: 120000, gambar: "https://picsum.photos/seed/mn69/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn70", mitraId: "m24", nama: "Bola Sepak", harga: 95000, gambar: "https://picsum.photos/seed/mn70/300", terlaris: true, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn71", mitraId: "m24", nama: "Raket Badminton", harga: 150000, gambar: "https://picsum.photos/seed/mn71/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+        { id: "mn72", mitraId: "m24", nama: "Sepatu Futsal", harga: 250000, gambar: "https://picsum.photos/seed/mn72/300", terlaris: false, tersedia: true, createdAt: now, updatedAt: now },
+    ];
+
+    const { error: menuError } = await supabase.from("menu_items").insert(menuData);
+    if (menuError) { console.error("[seedMitraData] Menu error:", menuError); return; }
+
+    console.log("[seedMitraData] Successfully seeded 24 mitra with 72 menu items");
 }

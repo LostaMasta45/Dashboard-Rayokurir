@@ -20,6 +20,7 @@
     "@radix-ui/react-dialog": "latest",
     "@radix-ui/react-dropdown-menu": "latest",
     "@radix-ui/react-hover-card": "latest",
+    "@radix-ui/react-icons": "^1.3.2",
     "@radix-ui/react-label": "latest",
     "@radix-ui/react-menubar": "latest",
     "@radix-ui/react-navigation-menu": "latest",
@@ -45,6 +46,7 @@
     "cmdk": "latest",
     "date-fns": "4.1.0",
     "embla-carousel-react": "latest",
+    "framer-motion": "^12.23.26",
     "geist": "latest",
     "input-otp": "latest",
     "lucide-react": "^0.454.0",
@@ -57,19 +59,19 @@
     "react-resizable-panels": "latest",
     "recharts": "latest",
     "sonner": "latest",
-    "tailwind-merge": "^2.5.5",
+    "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "latest",
     "zod": "3.25.67"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",
-    "@types/node": "^22",
-    "@types/react": "^18",
+    "@types/node": "^22.18.8",
+    "@types/react": "^18.3.25",
     "@types/react-dom": "^18",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",
-    "typescript": "^5"
+    "typescript": "^5.9.3"
   }
 }

@@ -24,7 +24,7 @@ CREATE TABLE orders (
   pickup JSONB NOT NULL,   -- { alamat }
   dropoff JSONB NOT NULL,  -- { alamat }
   kurirId TEXT,
-  status TEXT CHECK (status IN ('MENUNGGU_PICKUP', 'PICKUP_OTW', 'BARANG_DIAMBIL', 'SEDANG_DIKIRIM', 'SELESAI')) NOT NULL,
+  status TEXT CHECK (status IN ('BARU', 'ASSIGNED', 'PICKUP', 'DIKIRIM', 'SELESAI')) NOT NULL,
   jenisOrder TEXT CHECK (jenisOrder IN ('Barang', 'Makanan', 'Dokumen', 'Antar Jemput')) NOT NULL,
   serviceType TEXT CHECK (serviceType IN ('Reguler', 'Express', 'Same Day')) NOT NULL,
   ongkir INTEGER NOT NULL,
@@ -89,3 +89,60 @@ INSERT INTO users (username, role, name, courierId) VALUES
 INSERT INTO couriers (id, nama, wa, aktif, online) VALUES
   ('1', 'Budi Santoso', '081234567890', TRUE, TRUE),
   ('2', 'Sari Dewi', '081234567891', TRUE, FALSE);
+
+-- Tabel mitra (partners)
+CREATE TABLE IF NOT EXISTS mitra (
+  id TEXT PRIMARY KEY,
+  nama TEXT NOT NULL,
+  deskripsi TEXT,
+  kategori TEXT[] NOT NULL,
+  logo TEXT,
+  cover TEXT,
+  lokasi TEXT,
+  "waktuAntar" TEXT,
+  rating DECIMAL(2,1) DEFAULT 0,
+  "jumlahReview" INTEGER DEFAULT 0,
+  "sedangBuka" BOOLEAN DEFAULT TRUE,
+  whatsapp TEXT,
+  "createdAt" TIMESTAMP DEFAULT NOW(),
+  "updatedAt" TIMESTAMP DEFAULT NOW()
+);
+
+-- Tabel menu_items
+CREATE TABLE IF NOT EXISTS menu_items (
+  id TEXT PRIMARY KEY,
+  "mitraId" TEXT NOT NULL REFERENCES mitra(id) ON DELETE CASCADE,
+  nama TEXT NOT NULL,
+  deskripsi TEXT,
+  harga INTEGER NOT NULL,
+  gambar TEXT,
+  "kategoriMenu" TEXT,
+  terlaris BOOLEAN DEFAULT FALSE,
+  tersedia BOOLEAN DEFAULT TRUE,
+  "createdAt" TIMESTAMP DEFAULT NOW(),
+  "updatedAt" TIMESTAMP DEFAULT NOW()
+);
+
+-- Create index for faster queries
+CREATE INDEX IF NOT EXISTS idx_menu_items_mitra ON menu_items("mitraId");
+CREATE INDEX IF NOT EXISTS idx_mitra_kategori ON mitra USING GIN(kategori);
+
+-- =============================================
+-- SUPABASE STORAGE BUCKETS
+-- =============================================
+-- Jalankan di Supabase Dashboard > Storage > New Bucket
+-- atau gunakan SQL berikut:
+
+-- Buat bucket untuk gambar mitra (logos, covers, menus)
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('mitra-images', 'mitra-images', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Policy untuk public read
+CREATE POLICY "Public Access" ON storage.objects FOR SELECT USING (bucket_id = 'mitra-images');
+
+-- Policy untuk authenticated upload
+CREATE POLICY "Auth Upload" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'mitra-images');
+
+-- Policy untuk authenticated delete
+CREATE POLICY "Auth Delete" ON storage.objects FOR DELETE USING (bucket_id = 'mitra-images');

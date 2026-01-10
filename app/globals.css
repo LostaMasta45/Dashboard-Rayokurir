@@ -115,6 +115,12 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  
+  /* Custom Rayo Colors */
+  --color-rayo-primary: #14b8a6;
+  --color-rayo-secondary: #2dd4bf;
+  --color-rayo-dark: #0f766e;
+  --color-rayo-light: #e6fffb;
 }
 
 @layer base {
@@ -151,5 +157,15 @@
   }
   .border-rayo-primary {
     border-color: var(--rayo-primary);
+  }
+  .glass-effect {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+  .dark .glass-effect {
+    background: rgba(17, 24, 39, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.05);
   }
 }

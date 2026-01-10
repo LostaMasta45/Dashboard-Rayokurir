@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     Dialog,
     DialogContent,
@@ -17,17 +17,24 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { FormField, FormInput, FormTextarea } from "@/components/ui/form-field";
+import { ContactAutocomplete } from "@/components/contact-autocomplete";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
     getOrders,
     saveOrder,
     generateId,
     addOrUpdateContact,
+    getCouriers,
     type Order,
+    type Contact,
+    type Courier,
     SERVICE_TYPE_PRICING,
 } from "@/lib/auth";
 import { toast } from "sonner";
+import { Zap, FileText, UserPlus } from "lucide-react";
 
 interface AddOrderModalProps {
     isOpen: boolean;
@@ -52,9 +59,34 @@ export function AddOrderModal({
         codNominal: "",
         bayarOngkir: "NON_COD",
         notes: "",
+        kurirId: "",
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isQuickMode, setIsQuickMode] = useState(true);
+    const [couriers, setCouriers] = useState<Courier[]>([]);
+    const [orders, setOrders] = useState<Order[]>([]);
+
+    // Fetch couriers when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            loadCouriersAndOrders();
+        }
+    }, [isOpen]);
+
+    const loadCouriersAndOrders = async () => {
+        const [couriersData, ordersData] = await Promise.all([
+            getCouriers(),
+            getOrders(),
+        ]);
+        setCouriers(couriersData.filter(c => c.aktif));
+        setOrders(ordersData);
+    };
+
+    // Calculate active order count per courier
+    const getCourierOrderCount = (courierId: string) => {
+        return orders.filter(o => o.status !== "SELESAI" && o.kurirId === courierId).length;
+    };
 
     const resetForm = () => {
         setFormData({
@@ -69,6 +101,7 @@ export function AddOrderModal({
             codNominal: "",
             bayarOngkir: "NON_COD",
             notes: "",
+            kurirId: "",
         });
         setErrors({});
     };
@@ -173,8 +206,8 @@ export function AddOrderModal({
                 dropoff: {
                     alamat: formData.dropoffAlamat.trim(),
                 },
-                kurirId: null,
-                status: "MENUNGGU_PICKUP",
+                kurirId: (formData.kurirId && formData.kurirId !== "no-assign") ? formData.kurirId : null,
+                status: (formData.kurirId && formData.kurirId !== "no-assign") ? "ASSIGNED" : "BARU",
                 jenisOrder: formData.jenisOrder as
                     | "Barang"
                     | "Makanan"
@@ -200,7 +233,12 @@ export function AddOrderModal({
 
             await saveOrder(newOrder);
 
-            toast.success("Order berhasil ditambahkan!");
+            const actualKurirId = (formData.kurirId && formData.kurirId !== "no-assign") ? formData.kurirId : null;
+            const courierName = actualKurirId ? couriers.find(c => c.id === actualKurirId)?.nama : null;
+            toast.success(courierName
+                ? `Order berhasil ditambahkan dan di-assign ke ${courierName}!`
+                : "Order berhasil ditambahkan!"
+            );
             resetForm();
             onOrderAdded();
         } catch (error) {
@@ -217,11 +255,128 @@ export function AddOrderModal({
         onClose();
     };
 
+    // Handle contact selection from autocomplete
+    const handleContactSelect = (contact: Contact) => {
+        setFormData({
+            ...formData,
+            pengirimNama: contact.name,
+            pengirimWa: contact.whatsapp || "",
+            pickupAlamat: contact.address || "",
+        });
+        // Clear related errors
+        setErrors({
+            ...errors,
+            pengirimNama: "",
+            pengirimWa: "",
+            pickupAlamat: "",
+        });
+    };
+
+    // Handle submit and continue (for consecutive entries)
+    const handleSubmitAndContinue = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!validateForm()) {
+            toast.error("Mohon periksa kembali form yang diisi");
+            return;
+        }
+
+        setIsSubmitting(true);
+
+        try {
+            const codNominal = Number.parseFloat(formData.codNominal) || 0;
+            const danaTalangan = Number.parseFloat(formData.danaTalangan) || 0;
+            const ongkir = Number.parseFloat(formData.ongkir) || 0;
+            const now = new Date();
+
+            if (formData.pengirimNama.trim() && formData.pickupAlamat.trim()) {
+                addOrUpdateContact(
+                    formData.pengirimNama.trim(),
+                    formData.pengirimWa.trim() || "Tidak ada",
+                    formData.pickupAlamat.trim(),
+                    [],
+                    formData.notes.trim() || undefined
+                );
+            }
+
+            const newOrder: Order = {
+                id: generateId(),
+                createdAt: now.toISOString(),
+                createdDate: now.toDateString(),
+                pengirim: {
+                    nama: formData.pengirimNama.trim(),
+                    wa: formData.pengirimWa.trim(),
+                },
+                pickup: {
+                    alamat: formData.pickupAlamat.trim(),
+                },
+                dropoff: {
+                    alamat: formData.dropoffAlamat.trim(),
+                },
+                kurirId: (formData.kurirId && formData.kurirId !== "no-assign") ? formData.kurirId : null,
+                status: (formData.kurirId && formData.kurirId !== "no-assign") ? "ASSIGNED" : "BARU",
+                jenisOrder: formData.jenisOrder as
+                    | "Barang"
+                    | "Makanan"
+                    | "Dokumen"
+                    | "Antar Jemput",
+                serviceType: formData.serviceType as
+                    | "Reguler"
+                    | "Express"
+                    | "Same Day",
+                ongkir: ongkir,
+                danaTalangan: danaTalangan,
+                bayarOngkir: formData.bayarOngkir as "NON_COD" | "COD",
+                talanganReimbursed: false,
+                cod: {
+                    nominal: codNominal,
+                    isCOD: codNominal > 0,
+                    codPaid: false,
+                },
+                nonCodPaid:
+                    codNominal === 0 && formData.bayarOngkir === "NON_COD",
+                notes: formData.notes.trim(),
+            };
+
+            await saveOrder(newOrder);
+
+            const actualKurirId = (formData.kurirId && formData.kurirId !== "no-assign") ? formData.kurirId : null;
+            const courierName = actualKurirId ? couriers.find(c => c.id === actualKurirId)?.nama : null;
+            toast.success(courierName
+                ? `Order berhasil di-assign ke ${courierName}! Lanjut ke order berikutnya.`
+                : "Order berhasil ditambahkan! Silakan lanjut ke order berikutnya."
+            );
+
+            // Reset form but keep modal open for next entry
+            setFormData({
+                pengirimNama: "",
+                pengirimWa: "",
+                pickupAlamat: "",
+                dropoffAlamat: "",
+                jenisOrder: formData.jenisOrder, // Keep jenis order
+                serviceType: formData.serviceType, // Keep service type
+                ongkir: formData.ongkir, // Keep ongkir
+                danaTalangan: "",
+                codNominal: "",
+                bayarOngkir: "NON_COD",
+                notes: "",
+                kurirId: formData.kurirId, // Keep selected courier
+            });
+            setErrors({});
+            onOrderAdded(); // Refresh list
+        } catch (error) {
+            console.error("Error adding order:", error);
+            toast.error("Gagal menambahkan order. Silakan coba lagi.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const calculateSuggestedOngkir = (serviceType: string) => {
         const basePrice = 15000; // Base price for regular service
         const additionalPrice =
             SERVICE_TYPE_PRICING[
-                serviceType as keyof typeof SERVICE_TYPE_PRICING
+            serviceType as keyof typeof SERVICE_TYPE_PRICING
             ] || 0;
         return basePrice + additionalPrice;
     };
@@ -248,11 +403,27 @@ export function AddOrderModal({
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
-            <DialogContent className="w-[95vw] max-w-4xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
+            <DialogContent className={`${isQuickMode ? 'max-w-2xl' : 'max-w-4xl'} w-[95vw] max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto`}>
                 <DialogHeader className="pb-4">
-                    <DialogTitle className="text-xl sm:text-2xl font-bold text-rayo-dark">
-                        Tambah Order Baru
-                    </DialogTitle>
+                    <div className="flex items-center justify-between">
+                        <DialogTitle className="text-xl sm:text-2xl font-bold text-rayo-dark flex items-center gap-2">
+                            {isQuickMode ? (
+                                <><Zap className="h-5 w-5 text-orange-500" /> Quick Add Order</>
+                            ) : (
+                                <><FileText className="h-5 w-5 text-blue-500" /> Tambah Order Baru</>
+                            )}
+                        </DialogTitle>
+                        <div className="flex items-center gap-2">
+                            <Label htmlFor="quick-mode" className="text-sm text-muted-foreground">
+                                {isQuickMode ? "Quick" : "Full"}
+                            </Label>
+                            <Switch
+                                id="quick-mode"
+                                checked={isQuickMode}
+                                onCheckedChange={setIsQuickMode}
+                            />
+                        </div>
+                    </div>
                 </DialogHeader>
 
                 <form
@@ -265,16 +436,13 @@ export function AddOrderModal({
                             required
                             error={errors.pengirimNama}
                         >
-                            <FormInput
-                                id="pengirimNama"
+                            <ContactAutocomplete
                                 value={formData.pengirimNama}
-                                onChange={(e) =>
-                                    handleInputChange(
-                                        "pengirimNama",
-                                        e.target.value
-                                    )
+                                onChange={(value) =>
+                                    handleInputChange("pengirimNama", value)
                                 }
-                                placeholder="Masukkan nama pengirim"
+                                onSelect={handleContactSelect}
+                                placeholder="Ketik nama untuk autocomplete..."
                                 error={errors.pengirimNama}
                                 disabled={isSubmitting}
                                 className="h-10 sm:h-11"
@@ -360,11 +528,10 @@ export function AddOrderModal({
                                 disabled={isSubmitting}
                             >
                                 <SelectTrigger
-                                    className={`h-10 sm:h-11 ${
-                                        errors.jenisOrder
-                                            ? "border-red-500"
-                                            : ""
-                                    }`}
+                                    className={`h-10 sm:h-11 ${errors.jenisOrder
+                                        ? "border-red-500"
+                                        : ""
+                                        }`}
                                 >
                                     <SelectValue placeholder="Pilih jenis order" />
                                 </SelectTrigger>
@@ -396,11 +563,10 @@ export function AddOrderModal({
                                 disabled={isSubmitting}
                             >
                                 <SelectTrigger
-                                    className={`h-10 sm:h-11 ${
-                                        errors.serviceType
-                                            ? "border-red-500"
-                                            : ""
-                                    }`}
+                                    className={`h-10 sm:h-11 ${errors.serviceType
+                                        ? "border-red-500"
+                                        : ""
+                                        }`}
                                 >
                                     <SelectValue placeholder="Pilih service type" />
                                 </SelectTrigger>
@@ -540,28 +706,102 @@ export function AddOrderModal({
                         />
                     </FormField>
 
+                    {/* Courier Selection */}
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <UserPlus className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                            <h3 className="font-medium text-blue-900 dark:text-blue-100">Langsung Assign ke Kurir (Opsional)</h3>
+                        </div>
+                        <Select
+                            value={formData.kurirId}
+                            onValueChange={(value) => handleInputChange("kurirId", value)}
+                            disabled={isSubmitting}
+                        >
+                            <SelectTrigger className="h-11 bg-white dark:bg-gray-900">
+                                <SelectValue placeholder="Pilih kurir untuk langsung di-assign..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="no-assign">
+                                    ⏳ Nanti saja (assign manual)
+                                </SelectItem>
+                                {couriers.length === 0 ? (
+                                    <SelectItem value="none" disabled>
+                                        Tidak ada kurir aktif
+                                    </SelectItem>
+                                ) : (
+                                    couriers
+                                        .sort((a, b) => {
+                                            // Online first, then by order count
+                                            if (a.online && !b.online) return -1;
+                                            if (!a.online && b.online) return 1;
+                                            return getCourierOrderCount(a.id) - getCourierOrderCount(b.id);
+                                        })
+                                        .map((courier) => {
+                                            const orderCount = getCourierOrderCount(courier.id);
+                                            return (
+                                                <SelectItem key={courier.id} value={courier.id}>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`w-2 h-2 rounded-full ${courier.online ? 'bg-green-500' : 'bg-gray-400'}`} />
+                                                        <span>{courier.nama}</span>
+                                                        <Badge
+                                                            variant="secondary"
+                                                            className={`ml-1 text-xs ${orderCount === 0
+                                                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                                : orderCount >= 3
+                                                                    ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                                                                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                                                }`}
+                                                        >
+                                                            {orderCount} order
+                                                        </Badge>
+                                                    </div>
+                                                </SelectItem>
+                                            );
+                                        })
+                                )}
+                            </SelectContent>
+                        </Select>
+                        {formData.kurirId && (
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
+                                ✓ Order akan langsung di-assign dan status menjadi "ASSIGNED"
+                            </p>
+                        )}
+                    </div>
+
                     <div className="flex flex-col sm:flex-row gap-3 pt-4">
                         <Button
                             type="button"
                             variant="outline"
                             onClick={handleClose}
-                            className="flex-1 bg-transparent h-10 sm:h-11"
+                            className="sm:flex-1 bg-transparent h-10 sm:h-11"
                             disabled={isSubmitting}
                         >
                             Batal
                         </Button>
+                        {isQuickMode && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleSubmitAndContinue}
+                                disabled={isSubmitting}
+                                className="sm:flex-1 border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 h-10 sm:h-11"
+                            >
+                                {isSubmitting ? (
+                                    <span>Menyimpan...</span>
+                                ) : (
+                                    "+ Tambah & Lanjut"
+                                )}
+                            </Button>
+                        )}
                         <Button
                             type="submit"
                             disabled={isSubmitting}
-                            className="flex-1 bg-rayo-primary hover:bg-rayo-dark h-10 sm:h-11"
+                            className="sm:flex-1 bg-rayo-primary hover:bg-rayo-dark h-10 sm:h-11"
                         >
                             {isSubmitting ? (
-                                <div className="flex items-center gap-2">
-                                    <LoadingSpinner size="sm" />
-                                    <span>Menyimpan...</span>
-                                </div>
+                                <span>Menyimpan...</span>
                             ) : (
-                                "Simpan Order"
+                                isQuickMode ? "+ Simpan & Tutup" : "Simpan Order"
                             )}
                         </Button>
                     </div>

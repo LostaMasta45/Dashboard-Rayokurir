@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -130,6 +130,8 @@ export function ReportsPage() {
             (courier) => courier.aktif && courier.online
         ).length,
         totalContacts: contacts.length,
+        profit: 0,
+        completionRate: 0,
     };
 
     overallStats.profit =
@@ -182,10 +184,10 @@ export function ReportsPage() {
     // Order Status Distribution
     const getOrderStatusData = () => {
         const statusCounts = {
-            MENUNGGU_PICKUP: 0,
-            PICKUP_OTW: 0,
-            BARANG_DIAMBIL: 0,
-            SEDANG_DIKIRIM: 0,
+            BARU: 0,
+            ASSIGNED: 0,
+            PICKUP: 0,
+            DIKIRIM: 0,
             SELESAI: 0,
         };
 
@@ -196,22 +198,22 @@ export function ReportsPage() {
         return [
             {
                 name: "Menunggu Pickup",
-                value: statusCounts.MENUNGGU_PICKUP,
+                value: statusCounts.BARU,
                 color: "#6B7280",
             },
             {
                 name: "Pickup OTW",
-                value: statusCounts.PICKUP_OTW,
+                value: statusCounts.ASSIGNED,
                 color: "#3B82F6",
             },
             {
                 name: "Barang Diambil",
-                value: statusCounts.BARANG_DIAMBIL,
+                value: statusCounts.PICKUP,
                 color: "#F59E0B",
             },
             {
                 name: "Sedang Dikirim",
-                value: statusCounts.SEDANG_DIKIRIM,
+                value: statusCounts.DIKIRIM,
                 color: "#F97316",
             },
             { name: "Selesai", value: statusCounts.SELESAI, color: "#10B981" },
@@ -234,8 +236,8 @@ export function ReportsPage() {
                 type === "Express"
                     ? "#EF4444"
                     : type === "Same Day"
-                    ? "#8B5CF6"
-                    : "#10B981",
+                        ? "#8B5CF6"
+                        : "#10B981",
         }));
     };
 
@@ -266,7 +268,7 @@ export function ReportsPage() {
                     completionRate:
                         courierOrders.length > 0
                             ? (completedOrders.length / courierOrders.length) *
-                              100
+                            100
                             : 0,
                 };
             })
@@ -366,17 +368,17 @@ export function ReportsPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-8 gap-3 sm:gap-4">
-                <Card className="col-span-1 hover:shadow-md transition-shadow">
+                <Card className="col-span-1 hover:shadow-md transition-shadow bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/20 dark:to-gray-900 border-blue-100 dark:border-blue-900">
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
-                                <Package className="h-5 w-5 text-blue-600" />
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg flex-shrink-0">
+                                <Package className="h-5 w-5 text-blue-600 dark:text-blue-200" />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm text-gray-600 truncate">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
                                     Total Orders
                                 </p>
-                                <p className="text-xl font-bold text-blue-600">
+                                <p className="text-xl font-bold text-blue-600 dark:text-blue-400">
                                     {overallStats.totalOrders}
                                 </p>
                             </div>
@@ -384,17 +386,17 @@ export function ReportsPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="col-span-1 hover:shadow-md transition-shadow">
+                <Card className="col-span-1 hover:shadow-md transition-shadow bg-gradient-to-br from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 border-green-100 dark:border-green-900">
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
-                                <TrendingUp className="h-5 w-5 text-green-600" />
+                            <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg flex-shrink-0">
+                                <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-200" />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm text-gray-600 truncate">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
                                     Completion Rate
                                 </p>
-                                <p className="text-xl font-bold text-green-600">
+                                <p className="text-xl font-bold text-green-600 dark:text-green-400">
                                     {overallStats.completionRate.toFixed(1)}%
                                 </p>
                             </div>
@@ -402,17 +404,17 @@ export function ReportsPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="col-span-1 hover:shadow-md transition-shadow">
+                <Card className="col-span-1 hover:shadow-md transition-shadow bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-900/20 dark:to-gray-900 border-emerald-100 dark:border-emerald-900">
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-rayo-primary/10 rounded-lg flex-shrink-0">
-                                <DollarSign className="h-5 w-5 text-rayo-primary" />
+                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex-shrink-0">
+                                <DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-200" />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm text-gray-600 truncate">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
                                     Revenue
                                 </p>
-                                <p className="text-lg font-bold text-rayo-primary truncate">
+                                <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 truncate">
                                     {formatCurrency(overallStats.totalRevenue)}
                                 </p>
                             </div>
@@ -420,17 +422,17 @@ export function ReportsPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="col-span-1 hover:shadow-md transition-shadow">
+                <Card className="col-span-1 hover:shadow-md transition-shadow bg-gradient-to-br from-red-50 to-white dark:from-red-900/20 dark:to-gray-900 border-red-100 dark:border-red-900">
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-red-100 rounded-lg flex-shrink-0">
-                                <TrendingDown className="h-5 w-5 text-red-600" />
+                            <div className="p-2 bg-red-100 dark:bg-red-900 rounded-lg flex-shrink-0">
+                                <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-200" />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm text-gray-600 truncate">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
                                     Expenses
                                 </p>
-                                <p className="text-lg font-bold text-red-600 truncate">
+                                <p className="text-lg font-bold text-red-600 dark:text-red-400 truncate">
                                     {formatCurrency(overallStats.totalExpenses)}
                                 </p>
                             </div>
@@ -438,32 +440,30 @@ export function ReportsPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="col-span-1 hover:shadow-md transition-shadow">
+                <Card className={`col-span-1 hover:shadow-md transition-shadow bg-gradient-to-br ${overallStats.profit >= 0 ? 'from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 border-green-100 dark:border-green-900' : 'from-red-50 to-white dark:from-red-900/20 dark:to-gray-900 border-red-100 dark:border-red-900'}`}>
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
                             <div
-                                className={`p-2 rounded-lg flex-shrink-0 ${
-                                    overallStats.profit >= 0
-                                        ? "bg-green-100"
-                                        : "bg-red-100"
-                                }`}
+                                className={`p-2 rounded-lg flex-shrink-0 ${overallStats.profit >= 0
+                                    ? "bg-green-100 dark:bg-green-900"
+                                    : "bg-red-100 dark:bg-red-900"
+                                    }`}
                             >
                                 {overallStats.profit >= 0 ? (
-                                    <TrendingUp className="h-5 w-5 text-green-600" />
+                                    <TrendingUp className={`h-5 w-5 ${overallStats.profit >= 0 ? "text-green-600 dark:text-green-200" : "text-red-600 dark:text-red-200"}`} />
                                 ) : (
-                                    <TrendingDown className="h-5 w-5 text-red-600" />
+                                    <TrendingDown className={`h-5 w-5 ${overallStats.profit >= 0 ? "text-green-600 dark:text-green-200" : "text-red-600 dark:text-red-200"}`} />
                                 )}
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm text-gray-600 truncate">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
                                     Profit
                                 </p>
                                 <p
-                                    className={`text-lg font-bold truncate ${
-                                        overallStats.profit >= 0
-                                            ? "text-green-600"
-                                            : "text-red-600"
-                                    }`}
+                                    className={`text-lg font-bold truncate ${overallStats.profit >= 0
+                                        ? "text-green-600 dark:text-green-400"
+                                        : "text-red-600 dark:text-red-400"
+                                        }`}
                                 >
                                     {formatCurrency(overallStats.profit)}
                                 </p>
@@ -472,17 +472,17 @@ export function ReportsPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="col-span-1 hover:shadow-md transition-shadow">
+                <Card className="col-span-1 hover:shadow-md transition-shadow bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/20 dark:to-gray-900 border-purple-100 dark:border-purple-900">
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-purple-100 rounded-lg flex-shrink-0">
-                                <Users className="h-5 w-5 text-purple-600" />
+                            <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg flex-shrink-0">
+                                <Users className="h-5 w-5 text-purple-600 dark:text-purple-200" />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm text-gray-600 truncate">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
                                     Active Couriers
                                 </p>
-                                <p className="text-xl font-bold text-purple-600">
+                                <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
                                     {overallStats.activeCouriers}
                                 </p>
                             </div>
@@ -490,17 +490,17 @@ export function ReportsPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="col-span-1 hover:shadow-md transition-shadow">
+                <Card className="col-span-1 hover:shadow-md transition-shadow bg-gradient-to-br from-sky-50 to-white dark:from-sky-900/20 dark:to-gray-900 border-sky-100 dark:border-sky-900">
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
-                                <Users className="h-5 w-5 text-blue-600" />
+                            <div className="p-2 bg-sky-100 dark:bg-sky-900 rounded-lg flex-shrink-0">
+                                <Users className="h-5 w-5 text-sky-600 dark:text-sky-200" />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm text-gray-600 truncate">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
                                     Online Now
                                 </p>
-                                <p className="text-xl font-bold text-blue-600">
+                                <p className="text-xl font-bold text-sky-600 dark:text-sky-400">
                                     {overallStats.onlineCouriers}
                                 </p>
                             </div>
@@ -508,17 +508,17 @@ export function ReportsPage() {
                     </CardContent>
                 </Card>
 
-                <Card className="col-span-1 hover:shadow-md transition-shadow">
+                <Card className="col-span-1 hover:shadow-md transition-shadow bg-gradient-to-br from-orange-50 to-white dark:from-orange-900/20 dark:to-gray-900 border-orange-100 dark:border-orange-900">
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-orange-100 rounded-lg flex-shrink-0">
-                                <FileText className="h-5 w-5 text-orange-600" />
+                            <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg flex-shrink-0">
+                                <FileText className="h-5 w-5 text-orange-600 dark:text-orange-200" />
                             </div>
                             <div className="min-w-0 flex-1">
-                                <p className="text-sm text-gray-600 truncate">
+                                <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
                                     Total Contacts
                                 </p>
-                                <p className="text-xl font-bold text-orange-600">
+                                <p className="text-xl font-bold text-orange-600 dark:text-orange-400">
                                     {overallStats.totalContacts}
                                 </p>
                             </div>
@@ -604,7 +604,7 @@ export function ReportsPage() {
                                     cy="50%"
                                     outerRadius={90}
                                     dataKey="value"
-                                    label={({ name, percent }) =>
+                                    label={({ name, percent }: any) =>
                                         `${name} ${(percent * 100).toFixed(0)}%`
                                     }
                                     labelLine={false}
@@ -650,7 +650,7 @@ export function ReportsPage() {
                                     cy="50%"
                                     outerRadius={90}
                                     dataKey="value"
-                                    label={({ name, percent }) =>
+                                    label={({ name, percent }: any) =>
                                         `${name} ${(percent * 100).toFixed(0)}%`
                                     }
                                     labelLine={false}
@@ -792,12 +792,12 @@ export function ReportsPage() {
                                                             <Badge
                                                                 variant={
                                                                     courier.completionRate >=
-                                                                    80
+                                                                        80
                                                                         ? "default"
                                                                         : courier.completionRate >=
-                                                                          60
-                                                                        ? "secondary"
-                                                                        : "destructive"
+                                                                            60
+                                                                            ? "secondary"
+                                                                            : "destructive"
                                                                 }
                                                                 className="text-xs font-medium"
                                                             >
@@ -887,3 +887,4 @@ export function ReportsPage() {
         </div>
     );
 }
+

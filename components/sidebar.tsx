@@ -3,7 +3,9 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Package, DollarSign, Users, LogOut, Menu, X, Database, BarChart3 } from "lucide-react"
+import { LayoutDashboard, Package, DollarSign, Users, LogOut, Menu, X, Database, BarChart3, Sun, Moon, Camera, Store } from "lucide-react"
+import { useTheme } from "next-themes"
+import { NotificationCenter } from "@/components/notification-center"
 
 interface SidebarProps {
   currentPage: string
@@ -14,17 +16,25 @@ interface SidebarProps {
 
 export function Sidebar({ currentPage, onPageChange, onLogout, userRole }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const { setTheme, theme, resolvedTheme } = useTheme()
 
   const adminMenuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "orders", label: "Orders", icon: Package },
     { id: "keuangan", label: "Keuangan", icon: DollarSign },
     { id: "kurir", label: "Kurir", icon: Users },
+    { id: "mitra", label: "Mitra", icon: Store },
     { id: "database", label: "Database", icon: Database },
     { id: "reports", label: "Laporan", icon: BarChart3 },
   ]
 
-  const kurirMenuItems = [{ id: "dashboard", label: "Dashboard", icon: LayoutDashboard }]
+  const kurirMenuItems = [
+    { id: "dashboard", label: "Home", icon: LayoutDashboard },
+    { id: "orders", label: "Orders", icon: Package },
+    { id: "upload", label: "Upload Foto", icon: Camera },
+    { id: "keuangan", label: "Keuangan", icon: DollarSign },
+    { id: "profile", label: "Profil", icon: Users },
+  ]
 
   const menuItems = userRole === "ADMIN" ? adminMenuItems : kurirMenuItems
 
@@ -33,14 +43,17 @@ export function Sidebar({ currentPage, onPageChange, onLogout, userRole }: Sideb
   return (
     <>
       {/* Mobile menu button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="fixed top-3 left-3 z-50 lg:hidden bg-white shadow-lg border border-border hover:bg-gray-50 h-10 w-10 sm:h-12 sm:w-12 sm:top-4 sm:left-4"
-        onClick={toggleSidebar}
-      >
-        {isOpen ? <X className="h-4 w-4 sm:h-5 sm:w-5" /> : <Menu className="h-4 w-4 sm:h-5 sm:w-5" />}
-      </Button>
+      {/* Mobile menu button (Hidden for Kurir who uses BottomNav) */}
+      {userRole !== "KURIR" && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="fixed top-3 left-3 z-50 lg:hidden bg-white dark:bg-gray-900 shadow-lg border border-border hover:bg-gray-50 dark:hover:bg-gray-800 h-10 w-10 sm:h-12 sm:w-12 sm:top-4 sm:left-4"
+          onClick={toggleSidebar}
+        >
+          {isOpen ? <X className="h-4 w-4 sm:h-5 sm:w-5" /> : <Menu className="h-4 w-4 sm:h-5 sm:w-5" />}
+        </Button>
+      )}
 
       {/* Overlay */}
       {isOpen && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setIsOpen(false)} />}
@@ -48,26 +61,29 @@ export function Sidebar({ currentPage, onPageChange, onLogout, userRole }: Sideb
       {/* Sidebar */}
       <div
         className={cn(
-          "fixed left-0 top-0 h-full w-64 sm:w-72 bg-gradient-to-b from-white to-gray-50/50 border-r border-gray-200 z-40 transform transition-all duration-300 ease-in-out shadow-xl",
+          "fixed left-0 top-0 h-full w-64 sm:w-72 bg-gradient-to-b from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-950 border-r border-gray-200 dark:border-gray-800 z-40 transform transition-all duration-300 ease-in-out shadow-xl flex flex-col",
           isOpen ? "translate-x-0" : "-translate-x-full",
-          "lg:translate-x-0 lg:static lg:z-0 lg:shadow-none",
+          "lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-0 lg:shadow-none",
         )}
       >
         {/* Header */}
         <div className="p-4 sm:p-6 border-b border-gray-100">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center">
-              <img src="/rayo-logo.png" alt="Rayo Kurir Logo" className="w-full h-full object-contain" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center">
+                <img src="/rayo-logo.png" alt="Rayo Kurir Logo" className="w-full h-full object-contain" />
+              </div>
+              <div>
+                <h1 className="font-bold text-lg sm:text-xl text-gray-900 dark:text-gray-100">Rayo Kurir</h1>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium">{userRole}</p>
+              </div>
             </div>
-            <div>
-              <h1 className="font-bold text-lg sm:text-xl text-gray-900">Rayo Kurir</h1>
-              <p className="text-xs sm:text-sm text-gray-500 font-medium">{userRole}</p>
-            </div>
+            {userRole === "ADMIN" && <NotificationCenter />}
           </div>
         </div>
 
         {/* Navigation */}
-        <div className="flex-1 p-3 sm:p-4">
+        <div className="flex-1 p-3 sm:p-4 overflow-y-auto">
           <nav className="space-y-1">
             {menuItems.map((item) => {
               const Icon = item.icon
@@ -80,14 +96,14 @@ export function Sidebar({ currentPage, onPageChange, onLogout, userRole }: Sideb
                     "w-full justify-start gap-2 sm:gap-3 h-10 sm:h-12 px-3 sm:px-4 rounded-xl font-medium transition-all duration-200 text-sm sm:text-base",
                     isActive
                       ? "bg-rayo-primary text-white shadow-lg hover:bg-rayo-dark"
-                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900",
+                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
                   )}
                   onClick={() => {
                     onPageChange(item.id)
                     setIsOpen(false)
                   }}
                 >
-                  <Icon className={cn("h-4 w-4 sm:h-5 sm:w-5", isActive ? "text-white" : "text-gray-500")} />
+                  <Icon className={cn("h-4 w-4 sm:h-5 sm:w-5", isActive ? "text-white" : "text-gray-500 dark:text-gray-400")} />
                   <span className="truncate">{item.label}</span>
                 </Button>
               )
@@ -95,10 +111,20 @@ export function Sidebar({ currentPage, onPageChange, onLogout, userRole }: Sideb
           </nav>
         </div>
 
-        <div className="p-3 sm:p-4 border-t border-gray-100">
+        <div className="p-3 sm:p-4 border-t border-gray-100 dark:border-gray-800 space-y-2">
           <Button
             variant="ghost"
-            className="w-full justify-start gap-2 sm:gap-3 h-10 sm:h-12 px-3 sm:px-4 rounded-xl font-medium text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200 text-sm sm:text-base"
+            className="w-full justify-start gap-2 sm:gap-3 h-10 sm:h-12 px-3 sm:px-4 rounded-xl font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800 transition-all duration-200 text-sm sm:text-base"
+            onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+          >
+            <Sun className="h-4 w-4 sm:h-5 sm:w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-4 w-4 sm:h-5 sm:w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="truncate">Toggle Theme</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-2 sm:gap-3 h-10 sm:h-12 px-3 sm:px-4 rounded-xl font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/10 transition-all duration-200 text-sm sm:text-base"
             onClick={onLogout}
           >
             <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />

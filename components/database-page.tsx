@@ -227,8 +227,8 @@ export function DatabasePage() {
         const formattedNumber = cleanNumber.startsWith("0")
             ? "62" + cleanNumber.slice(1)
             : cleanNumber.startsWith("62")
-            ? cleanNumber
-            : "62" + cleanNumber;
+                ? cleanNumber
+                : "62" + cleanNumber;
 
         // Update last contacted di Supabase
         const contact = contacts.find((c) => c.id === contactId);
@@ -548,51 +548,51 @@ export function DatabasePage() {
 
             {/* Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <Card>
+                <Card className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/20 dark:to-gray-900 border-blue-100 dark:border-blue-900">
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-rayo-primary/10 rounded-lg">
-                                <MessageCircle className="h-5 w-5 text-rayo-primary" />
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                                <MessageCircle className="h-5 w-5 text-blue-600 dark:text-blue-200" />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
                                     Total Kontak
                                 </p>
-                                <p className="text-2xl font-bold text-gray-900">
+                                <p className="text-2xl font-bold text-gray-900 dark:text-white">
                                     {contacts.length}
                                 </p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
+                <Card className="bg-gradient-to-br from-green-50 to-white dark:from-green-900/20 dark:to-gray-900 border-green-100 dark:border-green-900">
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-green-100 rounded-lg">
-                                <Phone className="h-5 w-5 text-green-600" />
+                            <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                                <Phone className="h-5 w-5 text-green-600 dark:text-green-200" />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
                                     Hasil Pencarian
                                 </p>
-                                <p className="text-2xl font-bold text-gray-900">
+                                <p className="text-2xl font-bold text-gray-900 dark:text-white">
                                     {filteredContacts.length}
                                 </p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
+                <Card className="bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/20 dark:to-gray-900 border-purple-100 dark:border-purple-900">
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 rounded-lg">
-                                <Plus className="h-5 w-5 text-blue-600" />
+                            <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                                <Plus className="h-5 w-5 text-purple-600 dark:text-purple-200" />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
                                     Ditambahkan Hari Ini
                                 </p>
-                                <p className="text-2xl font-bold text-gray-900">
+                                <p className="text-2xl font-bold text-gray-900 dark:text-white">
                                     {
                                         contacts.filter(
                                             (c) =>
@@ -607,17 +607,17 @@ export function DatabasePage() {
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
+                <Card className="bg-gradient-to-br from-amber-50 to-white dark:from-amber-900/20 dark:to-gray-900 border-amber-100 dark:border-amber-900">
                     <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-purple-100 rounded-lg">
-                                <Tag className="h-5 w-5 text-purple-600" />
+                            <div className="p-2 bg-amber-100 dark:bg-amber-900 rounded-lg">
+                                <Tag className="h-5 w-5 text-amber-600 dark:text-amber-200" />
                             </div>
                             <div>
-                                <p className="text-sm text-gray-600">
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
                                     Total Tags
                                 </p>
-                                <p className="text-2xl font-bold text-gray-900">
+                                <p className="text-2xl font-bold text-gray-900 dark:text-white">
                                     {allTags.length}
                                 </p>
                             </div>

@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { Toaster } from "sonner"
 import "./globals.css"
 import { Suspense } from "react"
+import { ThemeProvider } from "@/components/theme-provider"
 
 export const metadata: Metadata = {
   title: "Rayo Kurir Dashboard",
@@ -29,21 +30,23 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <Suspense fallback={<div>Loading...</div>}>{children}</Suspense>
-        <Toaster
-          position="top-right"
-          richColors
-          closeButton
-          duration={3000}
-          toastOptions={{
-            style: {
-              background: "white",
-              border: "1px solid #e5e7eb",
-              color: "#374151",
-            },
-          }}
-        />
-        <Analytics />
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <Suspense fallback={<div>Loading...</div>}>{children}</Suspense>
+          <Toaster
+            position="top-right"
+            richColors
+            closeButton
+            duration={3000}
+            toastOptions={{
+              style: {
+                background: "white",
+                border: "1px solid #e5e7eb",
+                color: "#374151",
+              },
+            }}
+          />
+          <Analytics />
+        </ThemeProvider>
       </body>
     </html>
   )

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,14 +12,26 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Trash2, User, CheckCircle } from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, Search, Trash2, CheckCircle, Clock, Zap, Package, LayoutList, Columns3, LayoutGrid, Filter, ChevronUp, ChevronDown, Eye, MoreHorizontal } from "lucide-react";
 import { AddOrderModal } from "@/components/add-order-modal";
 import { AssignCourierModal } from "@/components/assign-courier-modal";
+import { OrderDetailModal } from "@/components/order-detail-modal";
+import { KanbanBoard } from "@/components/kanban-board";
+import { MobileOrderCard } from "@/components/mobile-order-card";
 import { toast } from "sonner";
 import {
     getOrders,
     getCouriers,
     formatCurrency,
+    deleteOrder,
     type Order,
     type Courier,
     ORDER_STATUS_CONFIG,
@@ -41,6 +53,9 @@ export function OrdersPage() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [viewMode, setViewMode] = useState<"table" | "kanban" | "cards">("table");
+    const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+    const [showDetailModal, setShowDetailModal] = useState(false);
 
     // Filters
     const [statusFilter, setStatusFilter] = useState("ALL");
@@ -52,6 +67,11 @@ export function OrdersPage() {
     const [talanganStatusFilter, setTalanganStatusFilter] = useState("ALL");
 
     useEffect(() => {
+        // Default to cards view on mobile to avoid horizontal scrolling
+        if (typeof window !== "undefined" && window.innerWidth < 640) {
+            setViewMode("cards");
+        }
+
         (async () => {
             await loadData();
         })();
@@ -146,12 +166,12 @@ export function OrdersPage() {
     const getStatusCounts = () => {
         return {
             all: orders.length,
-            menungguPickup: orders.filter((o) => o.status === "MENUNGGU_PICKUP")
+            menungguPickup: orders.filter((o) => o.status === "BARU")
                 .length,
-            pickupOtw: orders.filter((o) => o.status === "PICKUP_OTW").length,
-            barangDiambil: orders.filter((o) => o.status === "BARANG_DIAMBIL")
+            pickupOtw: orders.filter((o) => o.status === "ASSIGNED").length,
+            barangDiambil: orders.filter((o) => o.status === "PICKUP")
                 .length,
-            sedangDikirim: orders.filter((o) => o.status === "SEDANG_DIKIRIM")
+            sedangDikirim: orders.filter((o) => o.status === "DIKIRIM")
                 .length,
             selesai: orders.filter((o) => o.status === "SELESAI").length,
         };
@@ -159,22 +179,28 @@ export function OrdersPage() {
 
     const getStatusBadge = (status: Order["status"]) => {
         const statusConfig = {
-            MENUNGGU_PICKUP: {
-                label: "MENUNGGU",
-                color: "bg-gray-100 text-gray-800",
+            BARU: {
+                label: "Menunggu Kurir",
+                color: "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700",
             },
-            PICKUP_OTW: { label: "OTW", color: "bg-blue-100 text-blue-800" },
-            BARANG_DIAMBIL: {
-                label: "BARANG DIAMBIL",
-                color: "bg-amber-100 text-amber-800",
+            ASSIGNED: {
+                label: "Ditugaskan",
+                color: "bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800",
             },
-            SEDANG_DIKIRIM: {
-                label: "DIKIRIM",
-                color: "bg-orange-100 text-orange-800",
+            PICKUP: {
+                label: "Diambil",
+                color: "bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800",
             },
-            SELESAI: { label: "SELESAI", color: "bg-green-100 text-green-800" },
+            DIKIRIM: {
+                label: "Dikirim",
+                color: "bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200 border-orange-200 dark:border-orange-800",
+            },
+            SELESAI: {
+                label: "Selesai",
+                color: "bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 border-green-200 dark:border-green-800",
+            },
         };
-        const config = statusConfig[status] || statusConfig.MENUNGGU_PICKUP;
+        const config = statusConfig[status] || statusConfig.BARU;
         return <Badge className={config.color}>{config.label}</Badge>;
     };
 
@@ -209,8 +235,7 @@ export function OrdersPage() {
         await updateOrder({ ...order, nonCodPaid: !order.nonCodPaid });
         await loadData();
         toast.success(
-            `Status pembayaran ${
-                !order.nonCodPaid ? "sudah dibayar" : "belum dibayar"
+            `Status pembayaran ${!order.nonCodPaid ? "sudah dibayar" : "belum dibayar"
             }`
         );
     };
@@ -224,9 +249,9 @@ export function OrdersPage() {
         }
     };
 
-    const handleMarkTalanganReimbursed = (orderId: string) => {
+    const handleMarkTalanganReimbursed = async (orderId: string) => {
         if (confirm("Tandai talangan sebagai sudah diganti?")) {
-            const success = markTalanganReimbursed(orderId);
+            const success = await markTalanganReimbursed(orderId);
             if (success) {
                 loadData();
                 toast.success(
@@ -240,28 +265,78 @@ export function OrdersPage() {
 
     const getNextStatus = (currentStatus: Order["status"]) => {
         switch (currentStatus) {
-            case "MENUNGGU_PICKUP":
-                return "PICKUP_OTW";
-            case "PICKUP_OTW":
-                return "BARANG_DIAMBIL";
-            case "BARANG_DIAMBIL":
-                return "SEDANG_DIKIRIM";
-            case "SEDANG_DIKIRIM":
+            case "BARU":
+                return "ASSIGNED";
+            case "ASSIGNED":
+                return "PICKUP";
+            case "PICKUP":
+                return "DIKIRIM";
+            case "DIKIRIM":
                 return "SELESAI";
             default:
                 return currentStatus;
         }
     };
 
+    // Calculate active order count per courier (exclude SELESAI)
+    const getCourierOrderCounts = () => {
+        const counts: Record<string, number> = {};
+        couriers.forEach((c) => (counts[c.id] = 0));
+        orders
+            .filter((o) => o.status !== "SELESAI" && o.kurirId)
+            .forEach((o) => {
+                if (o.kurirId) counts[o.kurirId] = (counts[o.kurirId] || 0) + 1;
+            });
+        return counts;
+    };
+
+    // Priority style based on service type
+    const getPriorityStyle = (serviceType: string) => {
+        switch (serviceType) {
+            case "Same Day":
+                return "border-l-4 border-red-500 bg-red-50/50 dark:bg-red-900/10";
+            case "Express":
+                return "border-l-4 border-orange-500 bg-orange-50/50 dark:bg-orange-900/10";
+            default:
+                return "border-l-4 border-transparent hover:bg-muted/50 dark:hover:bg-muted/10";
+        }
+    };
+
+    // Priority badge component
+    const getPriorityBadge = (serviceType: string) => {
+        switch (serviceType) {
+            case "Same Day":
+                return (
+                    <Badge className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-200 text-xs gap-1 border-0">
+                        <Clock className="h-3 w-3" /> Urgent
+                    </Badge>
+                );
+            case "Express":
+                return (
+                    <Badge className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-200 text-xs gap-1 border-0">
+                        <Zap className="h-3 w-3" /> Express
+                    </Badge>
+                );
+            default:
+                return (
+                    <Badge className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs gap-1 border-0">
+                        <Package className="h-3 w-3" /> Reguler
+                    </Badge>
+                );
+        }
+    };
+
+    const courierOrderCounts = getCourierOrderCounts();
+
     const renderFinancialChips = (order: Order) => {
         return (
             <TooltipProvider>
-                <div className="space-y-1">
+                <div className="flex flex-col gap-1.5 items-start">
                     {/* Ongkir Chip */}
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <div className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded text-xs">
-                                💸 Ongkir {formatCurrency(order.ongkir)}
+                            <div className="inline-flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded text-[10px] sm:text-xs border border-blue-100 dark:border-blue-800 whitespace-nowrap">
+                                ðŸ’¸ Ongkir {formatCurrency(order.ongkir)}
                             </div>
                         </TooltipTrigger>
                         <TooltipContent>
@@ -273,26 +348,26 @@ export function OrdersPage() {
                     {order.danaTalangan > 0 && (
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <div className="inline-flex items-center gap-1 bg-orange-50 text-orange-700 px-2 py-1 rounded text-xs">
-                                    🧾 Talangan{" "}
-                                    {formatCurrency(order.danaTalangan)}
+                                <div className="inline-flex items-center gap-1 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 px-2 py-0.5 rounded text-[10px] sm:text-xs border border-orange-100 dark:border-orange-800 whitespace-nowrap">
+                                    ðŸ§¾ {formatCurrency(order.danaTalangan)}
                                     <Badge
-                                        className={`ml-1 text-xs ${
-                                            order.talanganReimbursed
-                                                ? "bg-green-100 text-green-800"
-                                                : "bg-red-100 text-red-800"
-                                        }`}
+                                        className={`ml-1 text-[10px] border-0 px-1 py-0 h-4 ${order.talanganReimbursed
+                                            ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                                            : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
+                                            }`}
                                     >
                                         {order.talanganReimbursed
-                                            ? "Sudah Diganti"
-                                            : "Belum Diganti"}
+                                            ? "Lunas"
+                                            : "Belum"}
                                     </Badge>
                                 </div>
                             </TooltipTrigger>
                             <TooltipContent>
                                 <p>
-                                    Uang yang kurir keluarkan di muka - bukan
-                                    pendapatan
+                                    Talangan: {formatCurrency(order.danaTalangan)} -
+                                    {order.talanganReimbursed
+                                        ? "Sudah Diganti"
+                                        : "Belum Diganti"}
                                 </p>
                             </TooltipContent>
                         </Tooltip>
@@ -302,25 +377,26 @@ export function OrdersPage() {
                     {order.cod.isCOD && (
                         <Tooltip>
                             <TooltipTrigger asChild>
-                                <div className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-1 rounded text-xs">
-                                    🏷️ COD {formatCurrency(order.cod.nominal)}
+                                <div className="inline-flex items-center gap-1 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded text-[10px] sm:text-xs border border-purple-100 dark:border-purple-800 whitespace-nowrap">
+                                    ðŸ·ï¸ {formatCurrency(order.cod.nominal)}
                                     <Badge
-                                        className={`ml-1 text-xs ${
-                                            order.cod.codPaid
-                                                ? "bg-green-100 text-green-800"
-                                                : "bg-red-100 text-red-800"
-                                        }`}
+                                        className={`ml-1 text-[10px] border-0 px-1 py-0 h-4 ${order.cod.codPaid
+                                            ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
+                                            : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
+                                            }`}
                                     >
                                         {order.cod.codPaid
-                                            ? "Sudah Setor"
-                                            : "Belum Setor"}
+                                            ? "Lunas"
+                                            : "Belum"}
                                     </Badge>
                                 </div>
                             </TooltipTrigger>
                             <TooltipContent>
                                 <p>
-                                    Harga barang titipan - kurir wajib setor ke
-                                    toko
+                                    COD: {formatCurrency(order.cod.nominal)} -
+                                    {order.cod.codPaid
+                                        ? "Sudah Setor"
+                                        : "Belum Setor"}
                                 </p>
                             </TooltipContent>
                         </Tooltip>
@@ -353,6 +429,40 @@ export function OrdersPage() {
                 </Button>
             </div>
 
+            {/* View Toggle */}
+            <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground mr-2 hidden sm:inline">View:</span>
+                <div className="flex rounded-lg border overflow-hidden">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`rounded-none px-2 sm:px-3 gap-1 sm:gap-1.5 ${viewMode === 'cards' ? 'bg-rayo-primary text-white hover:bg-rayo-dark' : ''}`}
+                        onClick={() => setViewMode('cards')}
+                    >
+                        <LayoutGrid className="h-4 w-4" />
+                        <span className="hidden sm:inline">Cards</span>
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`rounded-none px-2 sm:px-3 gap-1 sm:gap-1.5 ${viewMode === 'table' ? 'bg-rayo-primary text-white hover:bg-rayo-dark' : ''}`}
+                        onClick={() => setViewMode('table')}
+                    >
+                        <LayoutList className="h-4 w-4" />
+                        <span className="hidden sm:inline">Table</span>
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`rounded-none px-2 sm:px-3 gap-1 sm:gap-1.5 ${viewMode === 'kanban' ? 'bg-rayo-primary text-white hover:bg-rayo-dark' : ''}`}
+                        onClick={() => setViewMode('kanban')}
+                    >
+                        <Columns3 className="h-4 w-4" />
+                        <span className="hidden sm:inline">Kanban</span>
+                    </Button>
+                </div>
+            </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
                 <Card
                     className="cursor-pointer hover:bg-accent p-3 sm:p-4 transition-colors"
@@ -369,33 +479,33 @@ export function OrdersPage() {
                 </Card>
                 <Card
                     className="cursor-pointer hover:bg-accent p-3 sm:p-4 transition-colors"
-                    onClick={() => setStatusFilter("MENUNGGU_PICKUP")}
+                    onClick={() => setStatusFilter("BARU")}
                 >
                     <CardContent className="p-0 text-center">
                         <div className="text-lg sm:text-2xl font-bold text-gray-600">
                             {statusCounts.menungguPickup}
                         </div>
                         <div className="text-xs sm:text-sm text-muted-foreground">
-                            Menunggu
+                            Menunggu Kurir
                         </div>
                     </CardContent>
                 </Card>
                 <Card
                     className="cursor-pointer hover:bg-accent p-3 sm:p-4 transition-colors"
-                    onClick={() => setStatusFilter("PICKUP_OTW")}
+                    onClick={() => setStatusFilter("ASSIGNED")}
                 >
                     <CardContent className="p-0 text-center">
                         <div className="text-lg sm:text-2xl font-bold text-blue-600">
                             {statusCounts.pickupOtw}
                         </div>
                         <div className="text-xs sm:text-sm text-muted-foreground">
-                            Pickup
+                            Ditugaskan
                         </div>
                     </CardContent>
                 </Card>
                 <Card
                     className="cursor-pointer hover:bg-accent p-3 sm:p-4 transition-colors"
-                    onClick={() => setStatusFilter("BARANG_DIAMBIL")}
+                    onClick={() => setStatusFilter("PICKUP")}
                 >
                     <CardContent className="p-0 text-center">
                         <div className="text-lg sm:text-2xl font-bold text-yellow-600">
@@ -408,7 +518,7 @@ export function OrdersPage() {
                 </Card>
                 <Card
                     className="cursor-pointer hover:bg-accent p-3 sm:p-4 transition-colors"
-                    onClick={() => setStatusFilter("SEDANG_DIKIRIM")}
+                    onClick={() => setStatusFilter("DIKIRIM")}
                 >
                     <CardContent className="p-0 text-center">
                         <div className="text-lg sm:text-2xl font-bold text-orange-600">
@@ -434,368 +544,313 @@ export function OrdersPage() {
                 </Card>
             </div>
 
+            {/* Search and Filters */}
             <Card>
                 <CardContent className="p-4 sm:p-6">
                     <div className="flex flex-col gap-4">
-                        <div className="w-full">
-                            <div className="relative">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                            <div className="relative flex-1">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Cari nama, WA, atau alamat..."
                                     value={searchQuery}
-                                    onChange={(e) =>
-                                        setSearchQuery(e.target.value)
-                                    }
+                                    onChange={(e) => setSearchQuery(e.target.value)}
                                     className="pl-10 text-sm sm:text-base h-10 sm:h-11"
                                 />
                             </div>
+                            <Button
+                                variant="outline"
+                                onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+                                className={`gap-2 ${isFiltersOpen ? "bg-accent" : ""}`}
+                            >
+                                <Filter className="h-4 w-4" />
+                                <span className="hidden sm:inline">Filters</span>
+                                <Badge variant="secondary" className="ml-1 text-xs">
+                                    {[
+                                        statusFilter,
+                                        courierFilter,
+                                        jenisOrderFilter,
+                                        serviceTypeFilter,
+                                        bayarOngkirFilter,
+                                        talanganStatusFilter
+                                    ].filter(f => f !== "ALL").length}
+                                </Badge>
+                                {isFiltersOpen ? <ChevronUp className="h-4 w-4 ml-auto sm:ml-2" /> : <ChevronDown className="h-4 w-4 ml-auto sm:ml-2" />}
+                            </Button>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
-                            <Select
-                                value={statusFilter}
-                                onValueChange={setStatusFilter}
-                            >
-                                <SelectTrigger className="h-10 sm:h-11">
-                                    <SelectValue placeholder="Filter Status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="ALL">
-                                        Semua Status
-                                    </SelectItem>
-                                    <SelectItem value="MENUNGGU_PICKUP">
-                                        Menunggu Pickup
-                                    </SelectItem>
-                                    <SelectItem value="PICKUP_OTW">
-                                        Pickup OTW
-                                    </SelectItem>
-                                    <SelectItem value="BARANG_DIAMBIL">
-                                        Barang Diambil
-                                    </SelectItem>
-                                    <SelectItem value="SEDANG_DIKIRIM">
-                                        Sedang Dikirim
-                                    </SelectItem>
-                                    <SelectItem value="SELESAI">
-                                        Selesai
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select
-                                value={courierFilter}
-                                onValueChange={setCourierFilter}
-                            >
-                                <SelectTrigger className="h-10 sm:h-11">
-                                    <SelectValue placeholder="Filter Kurir" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="ALL">
-                                        Semua Kurir
-                                    </SelectItem>
-                                    {couriers.map((courier) => (
-                                        <SelectItem
-                                            key={courier.id}
-                                            value={courier.id}
-                                        >
-                                            {courier.nama}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <Select
-                                value={jenisOrderFilter}
-                                onValueChange={setJenisOrderFilter}
-                            >
-                                <SelectTrigger className="h-10 sm:h-11">
-                                    <SelectValue placeholder="Filter Jenis" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="ALL">
-                                        Semua Jenis
-                                    </SelectItem>
-                                    <SelectItem value="Barang">
-                                        Barang
-                                    </SelectItem>
-                                    <SelectItem value="Makanan">
-                                        Makanan
-                                    </SelectItem>
-                                    <SelectItem value="Dokumen">
-                                        Dokumen
-                                    </SelectItem>
-                                    <SelectItem value="Antar Jemput">
-                                        Antar Jemput
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select
-                                value={serviceTypeFilter}
-                                onValueChange={setServiceTypeFilter}
-                            >
-                                <SelectTrigger className="h-10 sm:h-11">
-                                    <SelectValue placeholder="Filter Service" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="ALL">
-                                        Semua Service
-                                    </SelectItem>
-                                    <SelectItem value="Reguler">
-                                        Reguler
-                                    </SelectItem>
-                                    <SelectItem value="Express">
-                                        Express
-                                    </SelectItem>
-                                    <SelectItem value="Same Day">
-                                        Same Day
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select
-                                value={bayarOngkirFilter || "ALL"}
-                                onValueChange={(value) =>
-                                    setBayarOngkirFilter(value)
-                                }
-                            >
-                                <SelectTrigger className="h-10 sm:h-11">
-                                    <SelectValue placeholder="Cara Bayar Ongkir" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="ALL">
-                                        Semua Cara Bayar
-                                    </SelectItem>
-                                    <SelectItem value="NON_COD">
-                                        Non-COD
-                                    </SelectItem>
-                                    <SelectItem value="COD">COD</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select
-                                value={talanganStatusFilter || "ALL"}
-                                onValueChange={(value) =>
-                                    setTalanganStatusFilter(value)
-                                }
-                            >
-                                <SelectTrigger className="h-10 sm:h-11">
-                                    <SelectValue placeholder="Status Talangan" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="ALL">
-                                        Semua Status Talangan
-                                    </SelectItem>
-                                    <SelectItem value="REIMBURSED">
-                                        Sudah Diganti
-                                    </SelectItem>
-                                    <SelectItem value="OUTSTANDING">
-                                        Belum Diganti
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+
+                        {isFiltersOpen && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 animate-in slide-in-from-top-2 duration-200">
+                                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                    <SelectTrigger className="h-10 sm:h-11">
+                                        <SelectValue placeholder="Filter Status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ALL">Semua Status</SelectItem>
+                                        <SelectItem value="BARU">Menunggu Kurir</SelectItem>
+                                        <SelectItem value="ASSIGNED">Ditugaskan</SelectItem>
+                                        <SelectItem value="PICKUP">Barang Diambil</SelectItem>
+                                        <SelectItem value="DIKIRIM">Sedang Dikirim</SelectItem>
+                                        <SelectItem value="SELESAI">Selesai</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Select value={courierFilter} onValueChange={setCourierFilter}>
+                                    <SelectTrigger className="h-10 sm:h-11">
+                                        <SelectValue placeholder="Filter Kurir" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ALL">Semua Kurir</SelectItem>
+                                        {couriers.map((courier) => (
+                                            <SelectItem key={courier.id} value={courier.id}>
+                                                {courier.nama}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Select value={jenisOrderFilter} onValueChange={setJenisOrderFilter}>
+                                    <SelectTrigger className="h-10 sm:h-11">
+                                        <SelectValue placeholder="Filter Jenis" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ALL">Semua Jenis</SelectItem>
+                                        <SelectItem value="Barang">Barang</SelectItem>
+                                        <SelectItem value="Makanan">Makanan</SelectItem>
+                                        <SelectItem value="Dokumen">Dokumen</SelectItem>
+                                        <SelectItem value="Antar Jemput">Antar Jemput</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Select value={serviceTypeFilter} onValueChange={setServiceTypeFilter}>
+                                    <SelectTrigger className="h-10 sm:h-11">
+                                        <SelectValue placeholder="Filter Service" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ALL">Semua Service</SelectItem>
+                                        <SelectItem value="Reguler">Reguler</SelectItem>
+                                        <SelectItem value="Express">Express</SelectItem>
+                                        <SelectItem value="Same Day">Same Day</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Select value={bayarOngkirFilter || "ALL"} onValueChange={setBayarOngkirFilter}>
+                                    <SelectTrigger className="h-10 sm:h-11">
+                                        <SelectValue placeholder="Cara Bayar Ongkir" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ALL">Semua Cara Bayar</SelectItem>
+                                        <SelectItem value="NON_COD">Non-COD</SelectItem>
+                                        <SelectItem value="COD">COD</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Select value={talanganStatusFilter || "ALL"} onValueChange={setTalanganStatusFilter}>
+                                    <SelectTrigger className="h-10 sm:h-11">
+                                        <SelectValue placeholder="Status Talangan" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ALL">Semua Status Talangan</SelectItem>
+                                        <SelectItem value="REIMBURSED">Sudah Diganti</SelectItem>
+                                        <SelectItem value="OUTSTANDING">Belum Diganti</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-lg sm:text-xl">
-                        Daftar Orders ({filteredOrders.length})
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[1000px]">
-                            <thead>
-                                <tr className="border-b">
-                                    <th className="text-left py-3 px-3 sm:px-4 font-medium text-sm">
-                                        ID
-                                    </th>
-                                    <th className="text-left py-3 px-3 sm:px-4 font-medium text-sm">
-                                        Pengirim
-                                    </th>
-                                    <th className="text-left py-3 px-3 sm:px-4 font-medium text-sm">
-                                        Jenis & Service
-                                    </th>
-                                    <th className="text-left py-3 px-3 sm:px-4 font-medium text-sm">
-                                        Pickup
-                                    </th>
-                                    <th className="text-left py-3 px-3 sm:px-4 font-medium text-sm">
-                                        Dropoff
-                                    </th>
-                                    <th className="text-left py-3 px-3 sm:px-4 font-medium text-sm">
-                                        Kurir
-                                    </th>
-                                    <th className="text-left py-3 px-3 sm:px-4 font-medium text-sm">
-                                        Status
-                                    </th>
-                                    <th className="text-left py-3 px-3 sm:px-4 font-medium text-sm">
-                                        Finansial
-                                    </th>
-                                    <th className="text-left py-3 px-3 sm:px-4 font-medium text-sm">
-                                        Aksi
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredOrders.length === 0 ? (
-                                    <tr>
-                                        <td
-                                            colSpan={9}
-                                            className="text-center py-8 text-muted-foreground text-sm"
-                                        >
-                                            {orders.length === 0
-                                                ? "Belum ada order. Klik 'Tambah Order' untuk memulai."
-                                                : "Tidak ada order yang sesuai filter. Coba ubah kriteria pencarian."}
-                                        </td>
+            {viewMode === 'kanban' ? (
+                <KanbanBoard
+                    orders={filteredOrders}
+                    couriers={couriers}
+                    onOrderUpdated={loadData}
+                />
+            ) : viewMode === 'cards' ? (
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold">Orders ({filteredOrders.length})</h2>
+                    </div>
+                    {filteredOrders.length === 0 ? (
+                        <Card className="p-8 text-center">
+                            <p className="text-muted-foreground">Tidak ada order yang sesuai filter.</p>
+                        </Card>
+                    ) : (
+                        filteredOrders.map((order) => (
+                            <MobileOrderCard
+                                key={order.id}
+                                order={order}
+                                couriers={couriers}
+                                orderCounts={getCourierOrderCounts()}
+                                onDeleted={loadData}
+                            />
+                        ))
+                    )}
+                </div>
+            ) : (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-lg sm:text-xl">
+                            Daftar Orders ({filteredOrders.length})
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-800">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors">
+                                        <th className="text-left py-3 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider w-[1%] whitespace-nowrap">
+                                            ID
+                                        </th>
+                                        <th className="text-left py-3 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                                            Pengirim
+                                        </th>
+                                        <th className="text-left py-3 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                                            Info Order
+                                        </th>
+                                        <th className="text-left py-3 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                                            Rute
+                                        </th>
+                                        <th className="text-left py-3 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                                            Kurir
+                                        </th>
+                                        <th className="text-left py-3 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                                            Status
+                                        </th>
+                                        <th className="text-left py-3 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider">
+                                            Finansial
+                                        </th>
+                                        <th className="text-right py-3 px-3 font-medium text-xs text-muted-foreground uppercase tracking-wider w-[1%] whitespace-nowrap">
+                                            Aksi
+                                        </th>
                                     </tr>
-                                ) : (
-                                    filteredOrders.map((order) => (
-                                        <tr
-                                            key={order.id}
-                                            className="border-b hover:bg-muted/50"
-                                        >
-                                            <td className="py-3 px-3 sm:px-4 font-mono text-sm">
-                                                #{order.id.slice(-6)}
-                                            </td>
-                                            <td className="py-3 px-3 sm:px-4">
-                                                <div>
-                                                    <div className="font-medium text-sm">
-                                                        {order.pengirim.nama}
-                                                    </div>
-                                                    {order.pengirim.wa && (
-                                                        <div className="text-xs text-muted-foreground">
-                                                            {order.pengirim.wa}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="py-3 px-3 sm:px-4">
-                                                <div className="text-sm">
-                                                    <div className="font-medium">
-                                                        {order.jenisOrder}
-                                                    </div>
-                                                    <div className="text-muted-foreground text-xs">
-                                                        {order.serviceType}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="py-3 px-3 sm:px-4">
-                                                <div
-                                                    className="max-w-xs truncate text-sm"
-                                                    title={order.pickup.alamat}
-                                                >
-                                                    {order.pickup.alamat}
-                                                </div>
-                                            </td>
-                                            <td className="py-3 px-3 sm:px-4">
-                                                <div
-                                                    className="max-w-xs truncate text-sm"
-                                                    title={order.dropoff.alamat}
-                                                >
-                                                    {order.dropoff.alamat}
-                                                </div>
-                                            </td>
-                                            <td className="py-3 px-3 sm:px-4 text-sm">
-                                                {getCourierName(order.kurirId)}
-                                            </td>
-                                            <td className="py-3 px-3 sm:px-4">
-                                                {getStatusBadge(order.status)}
-                                            </td>
-                                            <td className="py-3 px-3 sm:px-4">
-                                                {renderFinancialChips(order)}
-                                            </td>
-                                            <td className="py-3 px-3 sm:px-4">
-                                                <div className="flex flex-wrap gap-1">
-                                                    {!order.kurirId && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() =>
-                                                                handleAssignCourier(
-                                                                    order
-                                                                )
-                                                            }
-                                                            className="h-8 w-8 p-0"
-                                                            title="Assign Kurir"
-                                                        >
-                                                            <User className="h-3 w-3" />
-                                                        </Button>
-                                                    )}
-                                                    {order.status !==
-                                                        "SELESAI" && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() =>
-                                                                handleStatusChange(
-                                                                    order.id,
-                                                                    getNextStatus(
-                                                                        order.status
-                                                                    )
-                                                                )
-                                                            }
-                                                            className="h-8 w-8 p-0"
-                                                            title="Update Status"
-                                                        >
-                                                            <CheckCircle className="h-3 w-3" />
-                                                        </Button>
-                                                    )}
-                                                    {order.danaTalangan > 0 &&
-                                                        !order.talanganReimbursed && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                onClick={() =>
-                                                                    handleMarkTalanganReimbursed(
-                                                                        order.id
-                                                                    )
-                                                                }
-                                                                className="h-8 px-2 text-xs bg-orange-50 hover:bg-orange-100"
-                                                                title="Mark Talangan as Reimbursed"
-                                                            >
-                                                                Talangan
-                                                            </Button>
-                                                        )}
-                                                    {!order.cod.isCOD && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() =>
-                                                                handleToggleNonCodPaid(
-                                                                    order.id
-                                                                )
-                                                            }
-                                                            className={`h-8 w-8 p-0 ${
-                                                                order.nonCodPaid
-                                                                    ? "bg-green-50"
-                                                                    : ""
-                                                            }`}
-                                                            title="Toggle Payment Status"
-                                                        >
-                                                            <span className="text-xs">
-                                                                $
-                                                            </span>
-                                                        </Button>
-                                                    )}
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() =>
-                                                            handleDeleteOrder(
-                                                                order.id
-                                                            )
-                                                        }
-                                                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                                                        title="Delete Order"
-                                                    >
-                                                        <Trash2 className="h-3 w-3" />
-                                                    </Button>
-                                                </div>
+                                </thead>
+                                <tbody>
+                                    {filteredOrders.length === 0 ? (
+                                        <tr>
+                                            <td
+                                                colSpan={8}
+                                                className="text-center py-8 text-muted-foreground text-sm"
+                                            >
+                                                {orders.length === 0
+                                                    ? "Belum ada order. Klik 'Tambah Order' untuk memulai."
+                                                    : "Tidak ada order yang sesuai filter. Coba ubah kriteria pencarian."}
                                             </td>
                                         </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </CardContent>
-            </Card>
+                                    ) : (
+                                        filteredOrders.map((order) => (
+                                            <tr
+                                                key={order.id}
+                                                className={`border-b transition-colors ${getPriorityStyle(order.serviceType)}`}
+                                            >
+                                                <td className="py-2.5 px-3 font-mono text-xs text-muted-foreground whitespace-nowrap align-top">
+                                                    #{order.id.slice(-6)}
+                                                </td>
+                                                <td className="py-2.5 px-3 align-top max-w-[150px]">
+                                                    <div>
+                                                        <div className="font-medium text-sm truncate" title={order.pengirim.nama}>
+                                                            {order.pengirim.nama}
+                                                        </div>
+                                                        <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                                                            {order.pengirim.wa || "-"}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-2.5 px-3 align-top">
+                                                    <div className="flex flex-col gap-1">
+                                                        <div className="text-xs font-medium">{order.jenisOrder}</div>
+                                                        <div>{getPriorityBadge(order.serviceType)}</div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-2.5 px-3 align-top max-w-[200px]">
+                                                    <div className="flex flex-col gap-1.5">
+                                                        <div className="flex items-start gap-2">
+                                                            <div className="mt-1 h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                                                            <div
+                                                                className="truncate text-xs text-gray-700 dark:text-gray-300"
+                                                                title={order.pickup.alamat}
+                                                            >
+                                                                {order.pickup.alamat}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-start gap-2">
+                                                            <div className="mt-1 h-2 w-2 rounded-full bg-red-500 shrink-0" />
+                                                            <div
+                                                                className="truncate text-xs text-gray-700 dark:text-gray-300"
+                                                                title={order.dropoff.alamat}
+                                                            >
+                                                                {order.dropoff.alamat}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-2.5 px-3 text-sm align-top">
+                                                    <div className="truncate max-w-[120px]" title={getCourierName(order.kurirId) || "Belum di-assign"}>
+                                                        {getCourierName(order.kurirId) || (
+                                                            <span className="text-muted-foreground italic text-xs">Belum di-assign</span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="py-2.5 px-3 align-top">
+                                                    <div className="scale-90 origin-top-left">
+                                                        {getStatusBadge(order.status)}
+                                                    </div>
+                                                </td>
+                                                <td className="py-2.5 px-3 align-top">
+                                                    {renderFinancialChips(order)}
+                                                </td>
+                                                <td className="py-2.5 px-3 text-right align-top">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                                                <span className="sr-only">Open menu</span>
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuLabel>Aksi</DropdownMenuLabel>
+                                                            <DropdownMenuItem onClick={() => { setSelectedOrder(order); setShowDetailModal(true); }}>
+                                                                <Eye className="mr-2 h-4 w-4" /> Lihat Detail
+                                                            </DropdownMenuItem>
+                                                            {order.status !== "SELESAI" && (
+                                                                <DropdownMenuItem onClick={() => handleStatusChange(order.id, getNextStatus(order.status))}>
+                                                                    <CheckCircle className="mr-2 h-4 w-4" /> Update Status
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            {order.danaTalangan > 0 && !order.talanganReimbursed && (
+                                                                <DropdownMenuItem onClick={() => handleMarkTalanganReimbursed(order.id)}>
+                                                                    <Clock className="mr-2 h-4 w-4" /> Mark Talangan Reimbursed
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            {!order.cod.isCOD && (
+                                                                <DropdownMenuItem onClick={() => handleToggleNonCodPaid(order.id)}>
+                                                                    <Zap className="mr-2 h-4 w-4" /> {order.nonCodPaid ? "Mark Unpaid" : "Mark Paid"}
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem
+                                                                onClick={async () => {
+                                                                    if (!confirm(`Hapus order #${order.id.slice(-6)}?`)) return;
+                                                                    const success = await deleteOrder(order.id);
+                                                                    if (success) {
+                                                                        toast.success("Order berhasil dihapus");
+                                                                        loadData();
+                                                                    } else {
+                                                                        toast.error("Gagal menghapus order");
+                                                                    }
+                                                                }}
+                                                                className="text-red-600 focus:text-red-600"
+                                                            >
+                                                                <Trash2 className="mr-2 h-4 w-4" /> Hapus Order
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             <AddOrderModal
                 isOpen={showAddModal}
@@ -816,6 +871,14 @@ export function OrdersPage() {
                     setShowAssignModal(false);
                 }}
             />
+
+            <OrderDetailModal
+                order={selectedOrder}
+                couriers={couriers}
+                open={showDetailModal}
+                onClose={() => setShowDetailModal(false)}
+            />
         </div>
     );
 }
+
