@@ -6,6 +6,11 @@ import { useTheme } from "next-themes";
 
 export const MitraHomeHeader = () => {
     const { theme, setTheme } = useTheme();
+    const [mounted, setMounted] = React.useState(false);
+
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
 
     return (
         <div className="bg-[#009688] dark:bg-[#115e59] text-white pt-12 pb-6 px-4 rounded-b-[2rem] shadow-lg relative overflow-hidden transition-colors duration-300">
@@ -28,7 +33,7 @@ export const MitraHomeHeader = () => {
                         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                         className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm active:scale-95 transition-all outline-none ring-1 ring-white/20 hover:bg-white/30"
                     >
-                        {theme === 'dark' ? <Sun className="w-5 h-5 text-white" /> : <Moon className="w-5 h-5 text-white" />}
+                        {mounted ? (theme === 'dark' ? <Sun className="w-5 h-5 text-white" /> : <Moon className="w-5 h-5 text-white" />) : <div className="w-5 h-5" />}
                     </button>
                     {/* Add Profile Picture here if requested later, keeping standard layout for now with just toggle as requested */}
                 </div>
@@ -36,10 +41,9 @@ export const MitraHomeHeader = () => {
                 {/* Location & Notifications */}
                 <div className="flex items-center justify-between">
                     <div className="flex flex-col">
-                        <p className="text-[10px] text-teal-100 font-bold tracking-widest uppercase mb-0.5">Lokasi Pengantaran</p>
-                        <div className="flex items-center gap-1.5 cursor-pointer group hover:bg-white/10 px-2 -ml-2 py-1 rounded-lg transition-colors w-fit">
-                            <p className="text-[15px] font-black text-white leading-none tracking-tight group-hover:text-teal-100 transition-colors">Kec. Sumobito</p>
-                            <span className="text-teal-200 text-[10px]">▼</span>
+                        <p className="text-[12px] text-teal-100 font-medium mb-0.5">Halo, Warga Sumobito! 👋</p>
+                        <div className="flex items-center gap-1.5 px-0 py-0 rounded-lg w-fit">
+                            <p className="text-[18px] font-black text-white leading-tight tracking-tight">Mau jajan apa hari ini?</p>
                         </div>
                     </div>
                     <div className="flex gap-3">

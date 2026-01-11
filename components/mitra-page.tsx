@@ -95,6 +95,7 @@ export function MitraPage() {
         waktuAntar: "",
         whatsapp: "",
         sedangBuka: true,
+        type: "food" as "food" | "retail" | "pharmacy" | "service" | "special",
     });
 
     const [menuForm, setMenuForm] = useState({
@@ -139,6 +140,7 @@ export function MitraPage() {
             waktuAntar: "",
             whatsapp: "",
             sedangBuka: true,
+            type: "food",
         });
     };
 
@@ -179,6 +181,7 @@ export function MitraPage() {
             rating: 0,
             jumlahReview: 0,
             sedangBuka: mitraForm.sedangBuka,
+            type: mitraForm.type,
             createdAt: now,
             updatedAt: now,
         };
@@ -212,6 +215,7 @@ export function MitraPage() {
             waktuAntar: mitraForm.waktuAntar.trim() || undefined,
             whatsapp: mitraForm.whatsapp.trim() || undefined,
             sedangBuka: mitraForm.sedangBuka,
+            type: mitraForm.type,
         };
 
         const result = await updateMitra(updatedMitra);
@@ -373,6 +377,7 @@ export function MitraPage() {
             waktuAntar: mitra.waktuAntar || "",
             whatsapp: mitra.whatsapp || "",
             sedangBuka: mitra.sedangBuka,
+            type: mitra.type || "food",
         });
         setIsEditMitraOpen(true);
     };
@@ -407,14 +412,17 @@ export function MitraPage() {
         return matchesSearch && matchesCategory;
     });
 
+    const activeMitraCount = mitraList.filter(m => m.sedangBuka).length;
+    const totalReviewCount = mitraList.reduce((acc, curr) => acc + curr.jumlahReview, 0);
+
     const getMenuCount = (mitraId: string) => {
         return menuItems.filter((m) => m.mitraId === mitraId).length;
     };
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rayo-primary"></div>
+            <div className="flex items-center justify-center h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-500"></div>
             </div>
         );
     }
@@ -452,6 +460,30 @@ export function MitraPage() {
                         onChange={(e) => setMitraForm({ ...mitraForm, deskripsi: e.target.value })}
                         className="mt-1.5 min-h-[80px]"
                     />
+                </div>
+
+                <div>
+                    <Label className="text-base font-semibold">Tipe Mitra *</Label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                        {[
+                            { id: "food", label: "Food & Bev" },
+                            { id: "retail", label: "Retail/Warung" },
+                            { id: "pharmacy", label: "Apotek" },
+                            { id: "service", label: "Jasa/Service" },
+                            { id: "special", label: "Special (PO)" },
+                        ].map((t) => (
+                            <Button
+                                key={t.id}
+                                type="button"
+                                variant={mitraForm.type === t.id ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setMitraForm({ ...mitraForm, type: t.id as any })}
+                                className={`h-10 px-4 ${mitraForm.type === t.id ? "bg-teal-500 hover:bg-teal-600" : ""}`}
+                            >
+                                {t.label}
+                            </Button>
+                        ))}
+                    </div>
                 </div>
 
                 <div>
@@ -641,207 +673,212 @@ export function MitraPage() {
     );
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-8 p-2 sm:p-4 max-w-7xl mx-auto pb-24">
+            {/* Header & Stats */}
+            <div className="flex flex-col lg:flex-row gap-6 lg:items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                        <Store className="h-7 w-7 text-teal-500" />
-                        Kelola Mitra
+                    <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100 flex items-center gap-3">
+                        <div className="h-10 w-10 sm:h-12 sm:w-12 bg-teal-100 dark:bg-teal-900/50 rounded-xl flex items-center justify-center text-teal-600 dark:text-teal-400">
+                            <Store className="h-6 w-6 sm:h-7 sm:w-7" />
+                        </div>
+                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-400 dark:to-emerald-400">
+                            Kelola Mitra
+                        </span>
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-1">
-                        {mitraList.length} mitra terdaftar
+                    <p className="text-gray-500 dark:text-gray-400 mt-2 ml-1">
+                        Pusat kontrol data mitra, menu, dan status operasional.
                     </p>
                 </div>
-                <Button
-                    onClick={() => {
-                        resetMitraForm();
-                        setIsAddMitraOpen(true);
-                    }}
-                    className="bg-teal-500 hover:bg-teal-600 text-white h-12 px-6"
-                >
-                    <Plus className="h-5 w-5 mr-2" />
-                    Tambah Mitra
-                </Button>
+
+                <div className="flex gap-3">
+                    <Card className="flex-1 lg:w-40 border-none shadow-sm bg-teal-50 dark:bg-teal-900/20">
+                        <CardContent className="p-4 flex items-center gap-3">
+                            <div className="p-2 bg-white dark:bg-teal-900 rounded-lg shadow-sm">
+                                <Store className="h-5 w-5 text-teal-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 font-medium uppercase">Total</p>
+                                <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{mitraList.length}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card className="flex-1 lg:w-40 border-none shadow-sm bg-green-50 dark:bg-green-900/20">
+                        <CardContent className="p-4 flex items-center gap-3">
+                            <div className="p-2 bg-white dark:bg-green-900 rounded-lg shadow-sm">
+                                <ToggleRight className="h-5 w-5 text-green-600" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500 font-medium uppercase">Aktif</p>
+                                <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{activeMitraCount}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
 
-            {/* Search & Filter */}
-            <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <Input
-                        placeholder="Cari mitra..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 h-12"
-                    />
-                </div>
-                <div className="flex gap-2 overflow-x-auto pb-2">
+            {/* Actions Bar */}
+            <div className="sticky top-4 z-30 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md p-4 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4 justify-between">
+                    <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <Input
+                            placeholder="Cari nama mitra, lokasi..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10 h-11 bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 transition-all focus:bg-white dark:focus:bg-gray-950 focus:ring-2 focus:ring-teal-500 rounded-xl"
+                        />
+                    </div>
                     <Button
-                        variant={selectedCategory === "semua" ? "default" : "outline"}
-                        onClick={() => setSelectedCategory("semua")}
-                        className={`h-12 ${selectedCategory === "semua" ? "bg-teal-500 hover:bg-teal-600" : ""}`}
+                        onClick={() => {
+                            resetMitraForm();
+                            setIsAddMitraOpen(true);
+                        }}
+                        className="bg-teal-600 hover:bg-teal-700 text-white h-11 px-6 rounded-xl shadow-lg shadow-teal-600/20 transition-all hover:scale-[1.02]"
                     >
-                        🍽️ Semua
+                        <Plus className="h-5 w-5 mr-2" />
+                        Tambah Mitra
                     </Button>
+                </div>
+
+                {/* Categories */}
+                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                    <Button
+                        variant={selectedCategory === "semua" ? "default" : "ghost"}
+                        onClick={() => setSelectedCategory("semua")}
+                        className={`h-9 rounded-full px-4 text-sm font-medium transition-all ${selectedCategory === "semua"
+                            ? "bg-teal-100 text-teal-700 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-300"
+                            : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"}`}
+                    >
+                        Semua
+                    </Button>
+                    <div className="w-px h-6 bg-gray-200 dark:bg-gray-800 self-center mx-1" />
                     {MITRA_CATEGORIES.map((cat) => (
                         <Button
                             key={cat.id}
-                            variant={selectedCategory === cat.id ? "default" : "outline"}
+                            variant={selectedCategory === cat.id ? "default" : "ghost"}
                             onClick={() => setSelectedCategory(cat.id)}
-                            className={`h-12 whitespace-nowrap ${selectedCategory === cat.id ? "bg-teal-500 hover:bg-teal-600" : ""}`}
+                            className={`h-9 rounded-full px-4 text-sm font-medium transition-all whitespace-nowrap ${selectedCategory === cat.id
+                                ? "bg-teal-100 text-teal-700 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-300"
+                                : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"}`}
                         >
-                            {cat.icon} {cat.label}
+                            <span className="mr-1.5">{cat.icon}</span>
+                            {cat.label}
                         </Button>
                     ))}
                 </div>
             </div>
 
-            {/* Mitra Grid */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {filteredMitra.map((mitra) => (
-                    <Card key={mitra.id} className="overflow-hidden hover:shadow-lg transition-all group">
-                        {/* Cover Image */}
-                        <div className="relative h-36 bg-gradient-to-r from-teal-100 to-teal-50 dark:from-teal-900/30 dark:to-teal-800/20">
-                            {mitra.cover ? (
-                                <img
-                                    src={mitra.cover}
-                                    alt={mitra.nama}
-                                    className="w-full h-full object-cover"
-                                />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                    <ImageIcon className="h-12 w-12 text-teal-300" />
-                                </div>
-                            )}
-                            {/* Status Badge */}
-                            <Badge
-                                className={`absolute top-2 right-2 ${mitra.sedangBuka
-                                    ? "bg-green-500 hover:bg-green-600"
-                                    : "bg-red-500 hover:bg-red-600"
-                                    } text-white font-bold`}
-                            >
-                                {mitra.sedangBuka ? "🟢 BUKA" : "🔴 TUTUP"}
-                            </Badge>
-                            {/* Logo */}
-                            <div className="absolute -bottom-6 left-4 w-14 h-14 rounded-xl overflow-hidden border-4 border-white dark:border-gray-800 shadow-lg bg-white dark:bg-gray-700">
-                                {mitra.logo ? (
-                                    <img
-                                        src={mitra.logo}
-                                        alt={mitra.nama}
-                                        className="w-full h-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-teal-100 dark:bg-teal-900">
-                                        <Store className="h-6 w-6 text-teal-500" />
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <CardContent className="pt-8 pb-4">
-                            <div className="flex justify-between items-start mb-2">
-                                <h3 className="font-bold text-lg text-gray-900 dark:text-gray-100">
-                                    {mitra.nama}
-                                </h3>
-                                <div className="flex items-center gap-1 text-yellow-500">
-                                    <Star className="h-4 w-4 fill-current" />
-                                    <span className="text-sm font-medium">{mitra.rating.toFixed(1)}</span>
-                                    <span className="text-xs text-gray-400">({mitra.jumlahReview})</span>
-                                </div>
-                            </div>
-
-                            {/* Categories */}
-                            <div className="flex flex-wrap gap-1 mb-3">
-                                {mitra.kategori.map((kat) => {
-                                    const category = MITRA_CATEGORIES.find((c) => c.id === kat);
-                                    return (
-                                        <Badge key={kat} variant="secondary" className="text-xs">
-                                            {category?.icon} {category?.label}
-                                        </Badge>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Info */}
-                            <div className="space-y-1 text-sm text-gray-500 mb-4">
-                                {mitra.lokasi && (
-                                    <div className="flex items-center gap-2">
-                                        <MapPin className="h-4 w-4 text-gray-400" />
-                                        <span className="truncate">{mitra.lokasi}</span>
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-4">
-                                    {mitra.waktuAntar && (
-                                        <div className="flex items-center gap-1">
-                                            <Clock className="h-4 w-4 text-gray-400" />
-                                            <span>{mitra.waktuAntar}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex items-center gap-1">
-                                        <Utensils className="h-4 w-4 text-gray-400" />
-                                        <span>{getMenuCount(mitra.id)} menu</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    className="flex-1 h-11"
-                                    onClick={() => openMenuModal(mitra)}
-                                >
-                                    <MenuIcon className="h-4 w-4 mr-2" />
-                                    Menu ({getMenuCount(mitra.id)})
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-11 w-11"
-                                    onClick={() => openEditMitra(mitra)}
-                                >
+            {/* Content Grid */}
+            {filteredMitra.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center bg-gray-50 dark:bg-gray-900/50 rounded-3xl border border-dashed border-gray-200 dark:border-gray-800">
+                    <div className="h-20 w-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+                        <Store className="h-10 w-10 text-gray-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Tidak ada mitra ditemukan</h3>
+                    <p className="text-gray-500 max-w-sm mt-2 mb-6">
+                        Coba ubah kata kunci pencarian atau filter kategori untuk menemukan mitra.
+                    </p>
+                    <Button variant="outline" onClick={() => { setSearchQuery(""); setSelectedCategory("semua"); }}>
+                        Reset Pencarian
+                    </Button>
+                </div>
+            ) : (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {filteredMitra.map((mitra) => (
+                        <Card key={mitra.id} className="group relative overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-xl hover:shadow-teal-500/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl">
+                            {/* Actions Overlay (Visible on Hover) */}
+                            <div className="absolute inset-0 z-20 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[2px]">
+                                <Button size="sm" variant="secondary" onClick={() => openEditMitra(mitra)} className="h-9 w-9 rounded-full p-0 bg-white/90 hover:bg-white text-gray-800">
                                     <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-11 w-11"
-                                    onClick={() => handleToggleStatus(mitra)}
-                                >
-                                    {mitra.sedangBuka ? (
-                                        <ToggleRight className="h-5 w-5 text-green-500" />
-                                    ) : (
-                                        <ToggleLeft className="h-5 w-5 text-red-500" />
-                                    )}
+                                <Button size="sm" variant="secondary" onClick={() => openMenuModal(mitra)} className="h-9 px-4 rounded-full bg-teal-500 hover:bg-teal-600 text-white font-medium shadow-lg">
+                                    <MenuIcon className="h-4 w-4 mr-2" />
+                                    Kelola Menu
                                 </Button>
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-11 w-11 text-red-500 hover:text-red-600 hover:bg-red-50"
-                                    onClick={() => {
-                                        setSelectedMitra(mitra);
-                                        setIsDeleteMitraOpen(true);
-                                    }}
-                                >
+                                <Button size="sm" variant="destructive" onClick={() => { setSelectedMitra(mitra); setIsDeleteMitraOpen(true); }} className="h-9 w-9 rounded-full p-0">
                                     <Trash2 className="h-4 w-4" />
                                 </Button>
                             </div>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
 
-            {filteredMitra.length === 0 && (
-                <div className="text-center py-16">
-                    <Store className="h-16 w-16 text-gray-200 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                        Tidak ada mitra ditemukan
-                    </h3>
-                    <p className="text-gray-500">Ubah filter atau tambah mitra baru</p>
+                            {/* Cover & Status */}
+                            <div className="relative h-40 overflow-hidden">
+                                {mitra.cover ? (
+                                    <img src={mitra.cover} alt={mitra.nama} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                ) : (
+                                    <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center">
+                                        <ImageIcon className="h-10 w-10 text-gray-400/50" />
+                                    </div>
+                                )}
+                                <div className="absolute top-3 right-3 z-10">
+                                    <div
+                                        onClick={(e) => { e.stopPropagation(); handleToggleStatus(mitra); }}
+                                        className={`cursor-pointer px-3 py-1 rounded-full text-xs font-bold shadow-sm backdrop-blur-md border border-white/10 transition-colors flex items-center gap-1.5 ${mitra.sedangBuka
+                                                ? "bg-green-500/90 text-white hover:bg-green-600"
+                                                : "bg-black/70 text-gray-200 hover:bg-black/80"
+                                            }`}
+                                    >
+                                        <div className={`w-2 h-2 rounded-full ${mitra.sedangBuka ? "bg-white animate-pulse" : "bg-gray-400"}`} />
+                                        {mitra.sedangBuka ? "BUKA" : "TUTUP"}
+                                    </div>
+                                </div>
+                                <div className="absolute top-3 left-3 z-10">
+                                    <Badge variant="secondary" className="backdrop-blur-md bg-white/80 dark:bg-black/50 text-xs shadow-sm">
+                                        {mitra.type ? mitra.type.toUpperCase() : "FOOD"}
+                                    </Badge>
+                                </div>
+                            </div>
+
+                            {/* Content */}
+                            <CardContent className="p-5">
+                                <div className="flex justify-between items-start gap-3 mb-3">
+                                    <h3 className="font-bold text-lg text-gray-900 dark:text-gray-100 line-clamp-1 group-hover:text-teal-600 transition-colors">
+                                        {mitra.nama}
+                                    </h3>
+                                    <div className="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/30 px-2 py-0.5 rounded-md text-yellow-600 dark:text-yellow-400 text-xs font-bold">
+                                        <Star className="h-3 w-3 fill-current" />
+                                        {mitra.rating.toFixed(1)}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2.5">
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {mitra.kategori.slice(0, 3).map((kat) => {
+                                            const category = MITRA_CATEGORIES.find((c) => c.id === kat);
+                                            return (
+                                                <span key={kat} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                                                    {category?.icon} {category?.label}
+                                                </span>
+                                            );
+                                        })}
+                                        {mitra.kategori.length > 3 && (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500">
+                                                +{mitra.kategori.length - 3}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-100 dark:border-gray-800">
+                                        <div className="flex items-center gap-1.5">
+                                            <MapPin className="h-3.5 w-3.5" />
+                                            <span className="truncate max-w-[100px]">{mitra.lokasi || "-"}</span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className="flex items-center gap-1">
+                                                <Clock className="h-3.5 w-3.5" />
+                                                {mitra.waktuAntar || "-"}
+                                            </span>
+                                            <span className="flex items-center gap-1 text-teal-600 dark:text-teal-400 font-medium bg-teal-50 dark:bg-teal-900/20 px-1.5 py-0.5 rounded">
+                                                <Utensils className="h-3 w-3" />
+                                                {getMenuCount(mitra.id)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
                 </div>
             )}
-
             {/* Add Mitra Modal */}
             <Dialog open={isAddMitraOpen} onOpenChange={setIsAddMitraOpen}>
                 <DialogContent className="max-w-xl w-[95vw] max-h-[85vh] overflow-y-auto">
@@ -1080,6 +1117,6 @@ export function MitraPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div>
+        </div >
     );
 }

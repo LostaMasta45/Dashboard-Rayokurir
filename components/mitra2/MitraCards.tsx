@@ -6,11 +6,16 @@ export interface MitraData {
     nama: string;
     lokasi: string;
     category: string;
+    type: 'food' | 'retail' | 'pharmacy' | 'service' | 'special';
     rating: number;
     waktu: string;
     harga: number;
     cover: string;
     isBuka?: boolean;
+    // New fields for v1.0
+    catalog?: { category: string; items: any[] }[]; // For Food
+    quickPicks?: string[]; // For Retail/Pharmacy
+    services?: { name: string; unit: string; price?: number }[]; // For Service
 }
 
 // --- STYLE 1: Native Dark List (For 'Near You') ---
@@ -87,5 +92,31 @@ export const MitraCardStory = ({ data }: { data: MitraData }) => (
             </div>
         </div>
         <span className="text-[11px] text-gray-700 dark:text-gray-300 text-center truncate w-full leading-tight font-medium">{data.nama.split(' ')[0]}</span>
+    </div>
+);
+
+// --- STYLE 2: Glassmorphism Vivid (For 'Lagi Rame') ---
+export const MitraCardGlass = ({ data }: { data: MitraData }) => (
+    <div className="w-[160px] h-[220px] rounded-[24px] relative overflow-hidden shrink-0 group snap-center border border-gray-100 dark:border-gray-800">
+        <img src={data.cover} className="absolute inset-0 w-full h-full object-cover bg-gray-800" alt="" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+
+        <div className="absolute top-2 left-2 bg-white/10 backdrop-blur-md px-2 py-0.5 rounded-lg text-white text-[9px] font-bold border border-white/20">
+            {data.category}
+        </div>
+
+        <div className="absolute bottom-0 inset-x-0 p-3 flex flex-col">
+            <h3 className="text-white font-black text-sm leading-tight mb-0.5 truncate">{data.nama}</h3>
+            <p className="text-white/70 text-[10px] mb-2 flex items-center gap-1 truncate">
+                <MapPin className="w-3 h-3 shrink-0" /> {data.lokasi}
+            </p>
+
+            <div className="flex items-center justify-between">
+                <span className="text-teal-300 font-bold text-xs">Rp {(data.harga / 1000).toFixed(0)}k</span>
+                <div className="w-6 h-6 bg-white text-black rounded-full flex items-center justify-center">
+                    <ArrowRight className="w-3 h-3" />
+                </div>
+            </div>
+        </div>
     </div>
 );

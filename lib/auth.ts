@@ -98,6 +98,7 @@ export interface Mitra {
     nama: string;
     deskripsi?: string;
     kategori: string[];
+    type?: 'food' | 'retail' | 'pharmacy' | 'service' | 'special';
     logo?: string;
     cover?: string;
     lokasi?: string;
@@ -796,9 +797,14 @@ export async function toggleMenuItemTersedia(menuItemId: string): Promise<MenuIt
 
 export const MITRA_CATEGORIES = [
     { id: "makanan", label: "Makanan", icon: "🍜" },
-    { id: "minuman", label: "Minuman", icon: "🥤" },
-    { id: "retail", label: "Retail", icon: "🛒" },
-    { id: "toko", label: "Toko", icon: "🏪" },
+    { id: "kopi", label: "Kopi", icon: "☕" },
+    { id: "retail", label: "Retail / Sembako", icon: "🛒" },
+    { id: "frozen", label: "Frozen Food", icon: "🧊" },
+    { id: "apotek", label: "Apotek", icon: "💊" },
+    { id: "laundry", label: "Laundry", icon: "🧺" },
+    { id: "atk", label: "ATK / Fotokopi", icon: "📄" },
+    { id: "kue", label: "Kue & Jajanan", icon: "🎂" },
+    { id: "lainnya", label: "Lainnya", icon: "⋯" },
 ];
 
 // ==================== SEED MITRA DATA ====================
