@@ -673,7 +673,7 @@ export function MitraPage() {
     );
 
     return (
-        <div className="space-y-8 p-2 sm:p-4 max-w-7xl mx-auto pb-24">
+        <div className="space-y-8 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto pb-24">
             {/* Header & Stats */}
             <div className="flex flex-col lg:flex-row gap-6 lg:items-center justify-between">
                 <div>
@@ -785,51 +785,71 @@ export function MitraPage() {
             ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {filteredMitra.map((mitra) => (
-                        <Card key={mitra.id} className="group relative overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:shadow-xl hover:shadow-teal-500/5 hover:-translate-y-1 transition-all duration-300 rounded-2xl">
-                            {/* Actions Overlay (Visible on Hover) */}
-                            <div className="absolute inset-0 z-20 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[2px]">
-                                <Button size="sm" variant="secondary" onClick={() => openEditMitra(mitra)} className="h-9 w-9 rounded-full p-0 bg-white/90 hover:bg-white text-gray-800">
-                                    <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button size="sm" variant="secondary" onClick={() => openMenuModal(mitra)} className="h-9 px-4 rounded-full bg-teal-500 hover:bg-teal-600 text-white font-medium shadow-lg">
-                                    <MenuIcon className="h-4 w-4 mr-2" />
-                                    Kelola Menu
-                                </Button>
-                                <Button size="sm" variant="destructive" onClick={() => { setSelectedMitra(mitra); setIsDeleteMitraOpen(true); }} className="h-9 w-9 rounded-full p-0">
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </div>
-
+                        <Card key={mitra.id} className="group relative overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm hover:shadow-xl transition-all duration-300 rounded-3xl">
                             {/* Cover & Status */}
-                            <div className="relative h-40 overflow-hidden">
+                            <div className="relative h-48 overflow-hidden bg-gray-100 dark:bg-gray-800">
                                 {mitra.cover ? (
-                                    <img src={mitra.cover} alt={mitra.nama} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                    <img src={mitra.cover} alt={mitra.nama} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
                                 ) : (
-                                    <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 flex items-center justify-center">
+                                    <div className="w-full h-full flex items-center justify-center">
                                         <ImageIcon className="h-10 w-10 text-gray-400/50" />
                                     </div>
                                 )}
-                                <div className="absolute top-3 right-3 z-10">
+
+                                {/* Overlay Gradient for readability */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
+
+                                {/* Badges - Top Left Stack */}
+                                <div className="absolute top-3 left-3 z-10 flex flex-col gap-2">
                                     <div
                                         onClick={(e) => { e.stopPropagation(); handleToggleStatus(mitra); }}
-                                        className={`cursor-pointer px-3 py-1 rounded-full text-xs font-bold shadow-sm backdrop-blur-md border border-white/10 transition-colors flex items-center gap-1.5 ${mitra.sedangBuka
-                                                ? "bg-green-500/90 text-white hover:bg-green-600"
-                                                : "bg-black/70 text-gray-200 hover:bg-black/80"
+                                        className={`cursor-pointer px-3 py-1.5 rounded-full text-xs font-bold shadow-lg backdrop-blur-md border border-white/20 transition-all active:scale-95 flex items-center gap-1.5 w-fit ${mitra.sedangBuka
+                                            ? "bg-green-600 text-white"
+                                            : "bg-red-600 text-white"
                                             }`}
                                     >
-                                        <div className={`w-2 h-2 rounded-full ${mitra.sedangBuka ? "bg-white animate-pulse" : "bg-gray-400"}`} />
+                                        <div className={`w-1.5 h-1.5 rounded-full ${mitra.sedangBuka ? "bg-white animate-pulse" : "bg-white/50"}`} />
                                         {mitra.sedangBuka ? "BUKA" : "TUTUP"}
                                     </div>
-                                </div>
-                                <div className="absolute top-3 left-3 z-10">
-                                    <Badge variant="secondary" className="backdrop-blur-md bg-white/80 dark:bg-black/50 text-xs shadow-sm">
+                                    <Badge className="bg-black/50 hover:bg-black/60 backdrop-blur-md text-white border-0 text-xs px-3 py-1 w-fit">
                                         {mitra.type ? mitra.type.toUpperCase() : "FOOD"}
                                     </Badge>
                                 </div>
+
+                                {/* Action Buttons - Top Right */}
+                                <div className="absolute top-3 right-3 z-10 flex gap-2">
+                                    <Button
+                                        size="icon"
+                                        variant="secondary"
+                                        onClick={(e) => { e.stopPropagation(); openEditMitra(mitra); }}
+                                        className="h-8 w-8 rounded-full bg-white/90 hover:bg-white text-gray-700 backdrop-blur-sm border-0 shadow-lg hover:scale-105 transition-all"
+                                    >
+                                        <Edit className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                        size="icon"
+                                        variant="destructive"
+                                        onClick={(e) => { e.stopPropagation(); setSelectedMitra(mitra); setIsDeleteMitraOpen(true); }}
+                                        className="h-8 w-8 rounded-full bg-red-600/90 hover:bg-red-600 text-white backdrop-blur-sm border-0 shadow-lg hover:scale-105 transition-all"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Main Action - Centered Floating */}
+                            <div className="absolute top-48 left-0 right-0 -translate-y-1/2 flex justify-center z-20 px-4 pointer-events-none">
+                                <Button
+                                    onClick={() => openMenuModal(mitra)}
+                                    className="h-10 px-6 rounded-full bg-teal-500 hover:bg-teal-600 text-white font-bold shadow-lg shadow-teal-500/30 hover:scale-105 transition-transform pointer-events-auto flex items-center gap-2 max-w-full"
+                                >
+                                    <MenuIcon className="h-4 w-4" />
+                                    <span>Kelola Menu</span>
+                                </Button>
                             </div>
 
                             {/* Content */}
-                            <CardContent className="p-5">
+                            <CardContent className="pt-7 pb-5 px-4 sm:px-5">
                                 <div className="flex justify-between items-start gap-3 mb-3">
                                     <h3 className="font-bold text-lg text-gray-900 dark:text-gray-100 line-clamp-1 group-hover:text-teal-600 transition-colors">
                                         {mitra.nama}
