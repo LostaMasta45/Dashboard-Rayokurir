@@ -8,6 +8,8 @@ import { getCurrentUser } from "@/lib/auth"
 import { Menu, X, CheckCircle, Package, Truck, DollarSign, MessageCircle, MapPin, Star, Clock, ShoppingBag, FileText, Utensils, ChevronDown, Zap, ShieldCheck, Store, Pill, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence, Variants } from "framer-motion"
+import { InfiniteMarquee, LiveNotification, TypewriterText } from "@/components/lp2"
+import { OngkirCalculatorV2 } from "@/components/ongkir"
 
 export default function LandingPageLP2() {
     const [isOpen, setIsOpen] = useState(false)
@@ -197,17 +199,21 @@ export default function LandingPageLP2() {
 
                             <motion.h1
                                 variants={itemVariants}
-                                className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-tight mb-6 tracking-tight"
+                                className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-white leading-[1.1] mb-6 tracking-tight text-center lg:text-left"
                             >
-                                Kurir Lokal Andalan Warga <br />
-                                <motion.span
-                                    initial={{ backgroundPosition: "0% 50%" }}
-                                    animate={{ backgroundPosition: "100% 50%" }}
-                                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                                    className="text-transparent bg-clip-text bg-gradient-to-r from-teal-200 via-white to-teal-200 bg-[length:200%_auto]"
-                                >
-                                    Cepat, Dekat, Transparan
-                                </motion.span>
+                                <span className="block">Kurir Lokal</span>
+                                <span className="block">Andalan Warga</span>
+                                <span className="block mt-3 text-3xl sm:text-4xl lg:text-5xl">
+                                    <TypewriterText
+                                        phrases={[
+                                            "Bisa Kirim Makanan",
+                                            "Bisa Kirim Dokumen",
+                                            "Bisa Titip Belanja",
+                                            "Bisa Antar Paket",
+                                            "Bisa Express",
+                                        ]}
+                                    />
+                                </span>
                             </motion.h1>
 
                             <motion.p variants={itemVariants} className="text-lg sm:text-xl text-white/90 mb-6 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
@@ -247,7 +253,7 @@ export default function LandingPageLP2() {
                             initial={{ opacity: 0, scale: 0.8, x: 50 }}
                             animate={{ opacity: 1, scale: 1, x: 0 }}
                             transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
-                            className="relative mx-auto lg:ml-auto w-full max-w-md lg:max-w-full group hidden lg:block"
+                            className="relative mx-auto lg:ml-auto w-full max-w-md lg:max-w-full group block"
                         >
                             <div className="absolute inset-0 bg-gradient-to-tr from-teal-500/20 to-transparent rounded-full blur-3xl opacity-0 group-hover:opacity-30 transition-opacity duration-700"></div>
                             <img
@@ -259,6 +265,9 @@ export default function LandingPageLP2() {
                     </div>
                 </div>
             </section>
+
+            {/* Coverage Marquee */}
+            <InfiniteMarquee />
 
             {/* Trust Strip */}
             <section className="py-6 bg-white border-b border-gray-100">
@@ -416,13 +425,20 @@ export default function LandingPageLP2() {
                         ))}
                     </div>
 
-                    <div className="mt-12 text-center">
-                        <Button onClick={() => window.open(WA_LINK)} className="h-14 px-10 bg-rayo-dark hover:bg-rayo-primary text-white rounded-2xl shadow-xl font-bold text-lg">
-                            Cek Estimasi Ongkir via WhatsApp
-                        </Button>
-                        <p className="text-xs text-gray-400 mt-4">
+                    <div className="mt-12 text-center space-y-4">
+                        <Link href="/hitungongkir">
+                            <Button className="h-14 px-10 bg-rayo-dark hover:bg-rayo-primary text-white rounded-2xl shadow-xl font-bold text-lg">
+                                Hitung Ongkir Lengkap
+                            </Button>
+                        </Link>
+                        <p className="text-xs text-gray-400">
                             Catatan: untuk belanja besar / antre lama, admin akan konfirmasi DP dan/atau waiting fee.
                         </p>
+                    </div>
+
+                    {/* Ongkir Calculator Widget */}
+                    <div className="mt-16 max-w-lg mx-auto">
+                        <OngkirCalculatorV2 compact={true} />
                     </div>
                 </div>
             </section>
@@ -724,6 +740,9 @@ Catatan:`}
                     </div>
                 </div>
             </footer>
+
+            {/* Live Activity Notification */}
+            <LiveNotification />
         </div>
     )
 }

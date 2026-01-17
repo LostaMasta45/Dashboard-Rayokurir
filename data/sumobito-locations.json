@@ -1,0 +1,128 @@
+[
+    {
+        "id": "sumobito",
+        "label": "Sumobito",
+        "lat": -7.4892,
+        "lng": 112.3847
+    },
+    {
+        "id": "jogoloyo",
+        "label": "Jogoloyo",
+        "lat": -7.4823,
+        "lng": 112.3912
+    },
+    {
+        "id": "kedungpapar",
+        "label": "Kedung Papar",
+        "lat": -7.4756,
+        "lng": 112.3801
+    },
+    {
+        "id": "gedangsewu",
+        "label": "Gedang Sewu",
+        "lat": -7.4934,
+        "lng": 112.3756
+    },
+    {
+        "id": "segodobaru",
+        "label": "Segodo Baru",
+        "lat": -7.4801,
+        "lng": 112.3889
+    },
+    {
+        "id": "peterongan",
+        "label": "Peterongan",
+        "lat": -7.4678,
+        "lng": 112.4023
+    },
+    {
+        "id": "plosokerep",
+        "label": "Plosokerep",
+        "lat": -7.5012,
+        "lng": 112.3678
+    },
+    {
+        "id": "budug",
+        "label": "Budug",
+        "lat": -7.4945,
+        "lng": 112.3945
+    },
+    {
+        "id": "mentoro",
+        "label": "Mentoro",
+        "lat": -7.4789,
+        "lng": 112.3712
+    },
+    {
+        "id": "plumbongambang",
+        "label": "Plumbon Gambang",
+        "lat": -7.5089,
+        "lng": 112.3823
+    },
+    {
+        "id": "kendalsewu",
+        "label": "Kendal Sewu",
+        "lat": -7.4723,
+        "lng": 112.3956
+    },
+    {
+        "id": "podoroto",
+        "label": "Podoroto",
+        "lat": -7.4856,
+        "lng": 112.4089
+    },
+    {
+        "id": "janti",
+        "label": "Janti",
+        "lat": -7.4967,
+        "lng": 112.3534
+    },
+    {
+        "id": "badas",
+        "label": "Badas",
+        "lat": -7.5123,
+        "lng": 112.3712
+    },
+    {
+        "id": "tambakrejo",
+        "label": "Tambak Rejo",
+        "lat": -7.4634,
+        "lng": 112.3867
+    },
+    {
+        "id": "talun",
+        "label": "Talun",
+        "lat": -7.5045,
+        "lng": 112.4012
+    },
+    {
+        "id": "kesamben",
+        "label": "Kesamben",
+        "lat": -7.5189,
+        "lng": 112.3589
+    },
+    {
+        "id": "mojoagung",
+        "label": "Mojoagung",
+        "lat": -7.5534,
+        "lng": 112.3512
+    },
+    {
+        "id": "jombangkota",
+        "label": "Jombang Kota",
+        "lat": -7.5456,
+        "lng": 112.2312
+    },
+    {
+        "id": "diwek",
+        "label": "Diwek",
+        "lat": -7.4978,
+        "lng": 112.2845
+    },
+    {
+        "id": "mojowarno",
+        "label": "Mojowarno",
+        "lat": -7.5712,
+        "lng": 112.3234
+    }
+]
