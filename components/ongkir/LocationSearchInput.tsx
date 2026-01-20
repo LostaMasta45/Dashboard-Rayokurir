@@ -30,6 +30,7 @@ export function LocationSearchInput({
     onClear
 }: LocationSearchInputProps) {
     const [query, setQuery] = useState(value)
+    const [isEditing, setIsEditing] = useState(false) // Track if user is actively editing
     const [results, setResults] = useState<SearchResult[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [isOpen, setIsOpen] = useState(false)
@@ -37,9 +38,19 @@ export function LocationSearchInput({
     const inputRef = useRef<HTMLInputElement>(null)
     const containerRef = useRef<HTMLDivElement>(null)
 
-    // Debounced search
+    // The display value: show external value unless user is actively editing
+    const displayValue = isEditing ? query : value
+
+    // Check if value looks like a pre-selected location (contains coordinates)
+    const isPreselectedValue = (val: string) => {
+        // Matches patterns like "(-7.5133, 112.3476)" or "Titik Peta"
+        return /\(-?\d+\.\d+,\s*-?\d+\.\d+\)/.test(val) || val.includes("Titik Peta") || val.includes("Lokasi Saya")
+    }
+
+    // Debounced search - only when user is actively editing with valid search query
     useEffect(() => {
-        if (query.length < 2) {
+        // Skip search if not editing, too short, or looks like pre-selected coordinate value
+        if (!isEditing || query.length < 2 || isPreselectedValue(query)) {
             setResults([])
             return
         }
@@ -60,18 +71,14 @@ export function LocationSearchInput({
         }, 300)
 
         return () => clearTimeout(timer)
-    }, [query])
-
-    // Update query when value prop changes
-    useEffect(() => {
-        setQuery(value)
-    }, [value])
+    }, [query, isEditing])
 
     // Close dropdown on outside click
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
                 setIsOpen(false)
+                setIsEditing(false) // Exit editing mode when clicking outside
             }
         }
         document.addEventListener("mousedown", handleClickOutside)
@@ -80,12 +87,14 @@ export function LocationSearchInput({
 
     const handleSelect = (result: SearchResult) => {
         setQuery(result.label)
+        setIsEditing(false)
         setIsOpen(false)
         onSelect({ lat: result.lat, lng: result.lng, label: result.label })
     }
 
     const handleClear = () => {
         setQuery("")
+        setIsEditing(true)
         setResults([])
         setIsOpen(false)
         inputRef.current?.focus()
@@ -138,95 +147,126 @@ export function LocationSearchInput({
     }, [onSelect])
 
     return (
-        <div ref={containerRef} className={cn("relative", className)}>
+        <div ref={containerRef} className={cn("relative group", className)}>
             <div className="relative">
-                {/* Search Icon */}
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                    {isLoading ? (
-                        <Loader2 size={18} className="animate-spin" />
-                    ) : (
-                        <Search size={18} />
-                    )}
-                </div>
+                {/* Visual Indicator Line (Optional aesthetic) */}
+                <div className={cn(
+                    "absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full transition-colors",
+                    icon === "pickup" ? "bg-teal-500" : "bg-orange-500"
+                )} />
 
                 {/* Input */}
                 <input
                     ref={inputRef}
                     type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    onFocus={() => results.length > 0 && setIsOpen(true)}
+                    value={displayValue}
+                    onChange={(e) => {
+                        setIsEditing(true)
+                        setQuery(e.target.value)
+                    }}
+                    onFocus={() => {
+                        // Only open results if user is searching
+                        if (isEditing && results.length > 0) setIsOpen(true)
+                    }}
                     placeholder={placeholder}
                     className={cn(
-                        "w-full h-12 pl-10 pr-20 rounded-xl border-2 text-sm transition-all",
-                        "focus:outline-none focus:ring-2",
+                        "w-full h-14 pl-12 pr-24 rounded-2xl border-0 text-sm font-medium transition-all shadow-sm ring-1 ring-gray-200 dark:ring-gray-700 placeholder:font-normal placeholder:text-gray-400 dark:placeholder:text-gray-500/70 text-gray-900 dark:text-white",
+                        "focus:outline-none focus:ring-2 focus:shadow-md backdrop-blur-sm",
                         icon === "pickup"
-                            ? "border-teal-200 bg-teal-50/30 focus:ring-teal-500 focus:border-teal-500"
-                            : "border-orange-200 bg-orange-50/30 focus:ring-orange-500 focus:border-orange-500"
+                            ? "bg-white dark:bg-black/20 focus:ring-teal-500/50 border border-gray-200 dark:border-gray-700/50"
+                            : "bg-white dark:bg-black/20 focus:ring-orange-500/50 border border-gray-200 dark:border-gray-700/50"
                     )}
                 />
 
+                {/* Left Icon (Absolute) */}
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                    {isLoading ? (
+                        <Loader2 size={18} className="animate-spin text-gray-400" />
+                    ) : (
+                        <div className={cn(
+                            "p-1.5 rounded-full",
+                            icon === "pickup" ? "bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400" : "bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
+                        )}>
+                            <Search size={16} strokeWidth={2.5} />
+                        </div>
+                    )}
+                </div>
+
                 {/* Right buttons */}
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
                     {/* Clear button */}
                     {query && (
                         <button
                             onClick={handleClear}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                             title="Hapus"
                         >
-                            <X size={16} />
+                            <X size={16} strokeWidth={2.5} />
                         </button>
                     )}
+
+                    <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-0.5" />
 
                     {/* GPS button */}
                     <button
                         onClick={handleGetCurrentLocation}
                         disabled={isGettingLocation}
                         className={cn(
-                            "p-1.5 rounded-lg transition-colors",
+                            "flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all",
                             isGettingLocation
-                                ? "text-teal-500"
-                                : "text-gray-400 hover:text-teal-600 hover:bg-teal-50"
+                                ? "text-teal-500 bg-teal-50 dark:bg-teal-900/20"
+                                : "text-gray-500 dark:text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/20 bg-gray-50 dark:bg-gray-700/50"
                         )}
                         title="Gunakan lokasi saya"
                     >
                         {isGettingLocation ? (
-                            <Loader2 size={16} className="animate-spin" />
+                            <Loader2 size={14} className="animate-spin" />
                         ) : (
-                            <Navigation2 size={16} />
+                            <Navigation2 size={14} className="fill-current" />
                         )}
+                        <span className="hidden sm:inline">Lokasi Saya</span>
                     </button>
                 </div>
             </div>
 
             {/* Results dropdown */}
             {isOpen && results.length > 0 && (
-                <div className="absolute z-50 w-full mt-2 bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden">
-                    {results.map((result) => (
-                        <button
-                            key={result.id}
-                            onClick={() => handleSelect(result)}
-                            className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-start gap-3 border-b border-gray-100 last:border-b-0 transition-colors"
-                        >
-                            <MapPin size={16} className="mt-0.5 text-gray-400 shrink-0" />
-                            <div className="min-w-0">
-                                <p className="text-sm font-medium text-gray-900 truncate">
-                                    {result.label}
-                                </p>
-                                <p className="text-xs text-gray-500 capitalize">
-                                    {result.type}
-                                </p>
-                            </div>
-                        </button>
-                    ))}
+                <div className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 rounded-2xl ring-1 ring-gray-100 dark:ring-gray-700 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top">
+                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                        {results.map((result, index) => (
+                            <button
+                                key={result.id}
+                                onClick={() => handleSelect(result)}
+                                className={cn(
+                                    "w-full px-4 py-3.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700 flex items-start gap-3 transition-colors group/item",
+                                    index !== results.length - 1 && "border-b border-gray-50 dark:border-gray-700"
+                                )}
+                            >
+                                <div className="mt-1 p-1.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 group-hover/item:bg-teal-50 dark:group-hover/item:bg-teal-900/30 group-hover/item:text-teal-600 dark:group-hover/item:text-teal-400 transition-colors shrink-0">
+                                    <MapPin size={14} />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate group-hover/item:text-teal-700 dark:group-hover/item:text-teal-400">
+                                        {result.label}
+                                    </p>
+                                    <p className="text-xs text-gray-500 capitalize flex items-center gap-1">
+                                        {result.type}
+                                    </p>
+                                </div>
+                            </button>
+                        ))}
+                    </div>
                 </div>
             )}
 
             {/* No results message */}
             {isOpen && query.length >= 2 && results.length === 0 && !isLoading && (
-                <div className="absolute z-50 w-full mt-2 bg-white rounded-xl border border-gray-200 shadow-lg p-4 text-center text-sm text-gray-500">
-                    Tidak ada hasil untuk "{query}"
+                <div className="absolute z-50 w-full mt-2 bg-white dark:bg-gray-800 rounded-2xl ring-1 ring-gray-100 dark:ring-gray-700 shadow-xl p-6 text-center text-sm text-gray-500 dark:text-gray-400 animate-in fade-in zoom-in-95 duration-100">
+                    <div className="bg-gray-50 dark:bg-gray-700 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <MapPin size={20} className="text-gray-400 dark:text-gray-500" />
+                    </div>
+                    <p className="font-medium text-gray-900 dark:text-white">Lokasi tidak ditemukan</p>
+                    <p className="text-gray-400 dark:text-gray-500 mt-1">Coba kata kunci lain atau gunakan GPS</p>
                 </div>
             )}
         </div>

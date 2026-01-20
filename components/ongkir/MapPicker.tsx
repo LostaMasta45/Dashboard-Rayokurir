@@ -1,50 +1,54 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useTheme } from "next-themes"
 import { MapContainer, TileLayer, Marker, Polyline, useMapEvents, useMap } from "react-leaflet"
 import L from "leaflet"
-import { MapPin, Navigation, GripVertical, Loader2 } from "lucide-react"
+import { MapPin, Navigation, GripVertical, Loader2, MousePointerClick, Crosshair } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-// Custom icons with better visibility
-const createIcon = (color: string, label: string) => L.divIcon({
-    className: "custom-marker",
+// Custom icons with better visibility and premium look
+const createIcon = (colorClass: string, ringClass: string, label: string) => L.divIcon({
+    className: "custom-marker-group",
     html: `
-        <div class="relative">
-            <div class="w-10 h-10 ${color} rounded-full border-4 border-white shadow-lg flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing transition-transform hover:scale-110">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+        <div class="relative group">
+            <div class="absolute -inset-2 ${colorClass} opacity-20 rounded-full blur-sm group-hover:opacity-40 transition-opacity"></div>
+            <div class="relative z-10 w-12 h-12 ${colorClass} rounded-full border-[3px] border-white shadow-2xl flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing transition-transform hover:scale-110 ${ringClass}">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="10" r="3"/>
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+                    <path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z"/>
                 </svg>
             </div>
-            <div class="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gray-900 text-white text-xs px-2 py-1 rounded-full font-medium shadow-lg">
+            <div class="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-white/90 backdrop-blur-md text-gray-800 text-xs px-3 py-1.5 rounded-full font-bold shadow-md border border-white/50 z-20">
                 ${label}
             </div>
+            <div class="absolute top-[80%] left-1/2 -translate-x-1/2 w-1 h-3 bg-black/10 rounded-full blur-[1px]"></div>
         </div>
     `,
-    iconSize: [40, 60],
-    iconAnchor: [20, 20],
+    iconSize: [48, 60],
+    iconAnchor: [24, 24],
 })
 
-const pickupIcon = createIcon("bg-teal-500", "Jemput")
-const dropoffIcon = createIcon("bg-orange-500", "Antar")
+const pickupIcon = createIcon("bg-teal-500", "ring-4 ring-teal-500/20", "Jemput")
+const dropoffIcon = createIcon("bg-orange-500", "ring-4 ring-orange-500/20", "Antar")
 
 const basecampIcon = L.divIcon({
-    className: "custom-marker",
+    className: "custom-marker-basecamp",
     html: `
         <div class="relative">
-            <div class="w-8 h-8 bg-gray-700 rounded-full border-3 border-white shadow-md flex items-center justify-center">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+             <div class="w-10 h-10 bg-gray-800 rounded-full border-[3px] border-white shadow-xl flex items-center justify-center -translate-x-1/2 -translate-y-1/2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                     <path d="M3 21h18v-8H3v8zm6-11V7l3-3 3 3v3h-6z"/>
+                     <path d="M0 0h24v24H0z" fill="none"/>
                 </svg>
             </div>
-            <div class="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gray-700 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">
-                Basecamp
+           <div class="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gray-800 text-white text-[10px] px-2 py-1 rounded-md font-bold shadow-lg">
+                BASECAMP
             </div>
         </div>
     `,
-    iconSize: [32, 50],
-    iconAnchor: [16, 16],
+    iconSize: [40, 50],
+    iconAnchor: [20, 20],
 })
 
 export interface MapLocation {
@@ -110,7 +114,7 @@ function MapBoundsUpdater({ pickup, dropoff, basecamp, routeCoords }: {
         // Use route coordinates if available, else use marker positions
         if (routeCoords.length > 0) {
             const bounds = L.latLngBounds(routeCoords)
-            map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 })
+            map.fitBounds(bounds, { padding: [80, 80], maxZoom: 16 })
         } else {
             const points: [number, number][] = [[basecamp.lat, basecamp.lng]]
             if (pickup) points.push([pickup.lat, pickup.lng])
@@ -118,7 +122,7 @@ function MapBoundsUpdater({ pickup, dropoff, basecamp, routeCoords }: {
 
             if (points.length > 1) {
                 const bounds = L.latLngBounds(points)
-                map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 })
+                map.fitBounds(bounds, { padding: [80, 80], maxZoom: 16 })
             }
         }
     }, [pickup, dropoff, basecamp, routeCoords, map])
@@ -152,6 +156,8 @@ export function MapPicker({
     const [activeMode, setActiveMode] = useState<"pickup" | "dropoff" | null>(null)
     const [routeCoords, setRouteCoords] = useState<[number, number][]>([])
     const [isLoadingRoute, setIsLoadingRoute] = useState(false)
+    const { resolvedTheme } = useTheme()
+    const isDark = resolvedTheme === "dark"
 
     // Calculate center point
     const center: [number, number] = pickup
@@ -244,104 +250,95 @@ export function MapPicker({
 
     // Determine current step for guidance
     const getGuidanceText = () => {
-        if (!pickup && !dropoff) {
-            return { step: 1, text: "Klik tombol hijau lalu klik peta untuk pilih lokasi JEMPUT", color: "teal" }
-        }
-        if (pickup && !dropoff) {
-            return { step: 2, text: "Klik tombol orange lalu klik peta untuk pilih lokasi ANTAR", color: "orange" }
-        }
-        if (pickup && dropoff) {
-            return { step: 3, text: "Geser pin untuk mengatur ulang lokasi", color: "gray" }
-        }
-        return null
+        if (activeMode === "pickup") return { text: "Klik di peta untuk lokasi JEMPUT", color: "teal", icon: <MapPin size={16} /> }
+        if (activeMode === "dropoff") return { text: "Klik di peta untuk lokasi ANTAR", color: "orange", icon: <Navigation size={16} /> }
+
+        if (!pickup) return { text: "Set lokasi jemput", color: "gray", icon: <MapPin size={16} /> }
+        if (!dropoff) return { text: "Set lokasi antar", color: "gray", icon: <Navigation size={16} /> }
+        return { text: "Geser marker untuk akurasi", color: "gray", icon: <GripVertical size={16} /> }
     }
 
     const guidance = getGuidanceText()
 
     return (
-        <div className={cn("relative rounded-2xl overflow-hidden shadow-lg border border-gray-200", className)}>
-            {/* Step-by-step Guidance Banner */}
-            {guidance && (
-                <div className={cn(
-                    "absolute top-0 left-0 right-0 z-[1000] px-4 py-3 text-center text-sm font-medium",
-                    guidance.color === "teal" && "bg-teal-500 text-white",
-                    guidance.color === "orange" && "bg-orange-500 text-white",
-                    guidance.color === "gray" && "bg-gray-800 text-white"
-                )}>
-                    <div className="flex items-center justify-center gap-2">
-                        {guidance.step < 3 && (
-                            <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">
-                                Langkah {guidance.step}/2
-                            </span>
-                        )}
-                        {guidance.step === 3 && (
-                            <GripVertical size={16} className="opacity-70" />
-                        )}
-                        <span>{guidance.text}</span>
-                        {isLoadingRoute && (
-                            <Loader2 size={14} className="animate-spin ml-2" />
-                        )}
-                    </div>
-                </div>
-            )}
+        <div className={cn("relative h-full w-full bg-slate-50 dark:bg-gray-900 transition-colors", className)}>
 
-            {/* Action Buttons - Clear and visible with solid colors */}
-            <div className="absolute top-16 right-3 z-[1000] flex flex-col gap-2">
+            {/* Top Floating Bar for Guidance & Mode */}
+            <div className="absolute top-4 inset-x-4 z-[500] pointer-events-none flex justify-center">
+                <div className={cn(
+                    "pointer-events-auto bg-white/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg border border-white/50 flex items-center gap-3 transition-all",
+                    activeMode ? "scale-105 ring-4 ring-white/50" : ""
+                )}>
+                    <div className={cn(
+                        "flex items-center gap-2 text-sm font-semibold transition-colors",
+                        guidance.color === "teal" || activeMode === "pickup" ? "text-teal-600 dark:text-teal-400" :
+                            guidance.color === "orange" || activeMode === "dropoff" ? "text-orange-600 dark:text-orange-400" : "text-gray-600 dark:text-gray-800"
+                    )}>
+                        {activeMode ? <Crosshair size={18} className="animate-pulse" /> : guidance.icon}
+                        <span>{guidance.text}</span>
+                    </div>
+
+                    {isLoadingRoute && <Loader2 size={16} className="animate-spin text-teal-500" />}
+                </div>
+            </div>
+
+            {/* Right Side Control Buttons - Floating */}
+            <div className="absolute top-20 right-4 z-[500] flex flex-col gap-3">
+                {/* Pickup Toggle */}
                 <button
                     onClick={() => setActiveMode(activeMode === "pickup" ? null : "pickup")}
                     className={cn(
-                        "flex items-center gap-2 px-3 py-2.5 rounded-xl shadow-lg border-2 transition-all font-medium text-sm",
+                        "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-xl hover:scale-105 active:scale-95",
                         activeMode === "pickup"
-                            ? "bg-teal-600 text-white border-teal-700 ring-4 ring-teal-500/40 scale-105"
-                            : "bg-teal-500 text-white border-teal-600 hover:bg-teal-600"
+                            ? "bg-teal-500 text-white ring-4 ring-teal-500/30"
+                            : "bg-white text-gray-500 hover:text-teal-600"
                     )}
+                    title="Set Jemput di Peta"
                 >
-                    <MapPin size={18} />
-                    <span>Jemput</span>
+                    <MapPin size={22} className={activeMode === "pickup" ? "fill-current" : ""} />
                 </button>
+
+                {/* Dropoff Toggle */}
                 <button
                     onClick={() => setActiveMode(activeMode === "dropoff" ? null : "dropoff")}
                     className={cn(
-                        "flex items-center gap-2 px-3 py-2.5 rounded-xl shadow-lg border-2 transition-all font-medium text-sm",
+                        "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-xl hover:scale-105 active:scale-95",
                         activeMode === "dropoff"
-                            ? "bg-orange-600 text-white border-orange-700 ring-4 ring-orange-500/40 scale-105"
-                            : "bg-orange-500 text-white border-orange-600 hover:bg-orange-600"
+                            ? "bg-orange-500 text-white ring-4 ring-orange-500/30"
+                            : "bg-white text-gray-500 hover:text-orange-600"
                     )}
+                    title="Set Antar di Peta"
                 >
-                    <Navigation size={18} />
-                    <span>Antar</span>
+                    <Navigation size={22} className={activeMode === "dropoff" ? "fill-current" : ""} />
                 </button>
             </div>
 
-            {/* Legend - Bottom left */}
-            <div className="absolute bottom-3 left-3 z-[1000] bg-white/95 backdrop-blur-sm rounded-xl p-3 shadow-lg border border-gray-100">
-                <div className="space-y-1.5 text-xs">
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-gray-700 rounded-full"></div>
-                        <span className="text-gray-600">Basecamp</span>
+            {/* Legend - Bottom Left (Simplified) */}
+            <div className="absolute bottom-6 left-4 z-[500] hidden sm:block">
+                <div className="bg-white/80 backdrop-blur-md p-2 rounded-lg shadow-sm border border-white/50 flex flex-col gap-1.5">
+                    <div className="flex items-center gap-2 text-[10px] font-medium text-gray-600">
+                        <div className="w-2 h-2 rounded-full bg-teal-500"></div> Jemput
                     </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-teal-500 rounded-full"></div>
-                        <span className="text-gray-600">Lokasi Jemput</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                        <span className="text-gray-600">Lokasi Antar</span>
+                    <div className="flex items-center gap-2 text-[10px] font-medium text-gray-600">
+                        <div className="w-2 h-2 rounded-full bg-orange-500"></div> Antar
                     </div>
                 </div>
             </div>
+
 
             {/* Map Container */}
             <MapContainer
                 center={center}
                 zoom={14}
                 scrollWheelZoom={true}
-                className="h-full w-full min-h-[350px]"
+                className="h-full w-full z-0"
                 style={{ background: "#f8fafc" }}
+                zoomControl={false} // We will add custom if needed, or stick to default placement if we didn't block it
             >
+                {/* Clean, Elegant Map Tiles - Switch based on theme */}
                 <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
+                    url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                 />
 
                 {/* Bounds Updater */}
@@ -380,16 +377,16 @@ export function MapPicker({
                         <Polyline
                             positions={routeCoords}
                             pathOptions={{
-                                color: "#000",
+                                color: "#0d9488", // teal-600
                                 weight: 8,
-                                opacity: 0.15,
+                                opacity: 0.2,
                             }}
                         />
                         {/* Main line */}
                         <Polyline
                             positions={routeCoords}
                             pathOptions={{
-                                color: "#14B8A6",
+                                color: "#14B8A6", // teal-500
                                 weight: 5,
                                 opacity: 0.9,
                             }}
@@ -403,16 +400,16 @@ export function MapPicker({
                 )}
             </MapContainer>
 
-            {/* Active Mode Overlay Indicator */}
+            {/* Active Mode Cursor Instruction (Optional, maybe too much UI) */}
             {activeMode && (
-                <div className="absolute inset-0 pointer-events-none z-[999] border-4 rounded-2xl animate-pulse"
-                    style={{ borderColor: activeMode === "pickup" ? "#14b8a6" : "#f97316" }}
-                />
+                <div className="absolute inset-0 pointer-events-none z-[400] bg-black/5 flex items-center justify-center">
+                    <div className="bg-black/70 text-white px-3 py-1.5 rounded-full text-sm font-medium animate-bounce shadow-xl">
+                        Klik Peta
+                    </div>
+                </div>
             )}
         </div>
     )
 }
 
 export default MapPicker
-
-

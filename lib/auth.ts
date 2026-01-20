@@ -31,21 +31,56 @@ export interface Order {
     };
     pickup: {
         alamat: string;
+        mapsLink?: string;
     };
     dropoff: {
         alamat: string;
+        mapsLink?: string;
     };
     kurirId: string | null;
     status:
+    | "NEW"
+    | "OFFERED"
+    | "ACCEPTED"
+    | "REJECTED"
+    | "OTW_PICKUP"
+    | "PICKED"
+    | "OTW_DROPOFF"
+    | "NEED_POD"
+    | "DELIVERED"
+    | "CANCELLED"
+    // Legacy status (backward compatibility)
     | "BARU"
     | "ASSIGNED"
     | "PICKUP"
     | "DIKIRIM"
     | "SELESAI";
-    jenisOrder: "Barang" | "Makanan" | "Dokumen" | "Antar Jemput";
-    serviceType: "Reguler" | "Express" | "Same Day";
+    jenisOrder:
+    | "Antar Barang"
+    | "Jemput Barang"
+    | "Titip Beli"
+    | "Dokumen"
+    | "Lainnya"
+    // Legacy types
+    | "Barang"
+    | "Makanan"
+    | "Antar Jemput";
+    serviceType:
+    | "Regular"
+    | "Express"
+    // Legacy types
+    | "Reguler"
+    | "Same Day";
+    addons?: {
+        returnPP: boolean;
+        bulky: boolean;
+        heavy: boolean;
+        waitingFee: boolean;
+        waitingFeeAmount?: number;
+    };
     ongkir: number;
     danaTalangan: number;
+    talanganDiganti?: boolean;
     bayarOngkir: "NON_COD" | "COD";
     talanganReimbursed?: boolean;
     cod: {
@@ -53,8 +88,22 @@ export interface Order {
         isCOD: boolean;
         codPaid: boolean;
     };
+    codSettled?: boolean;
     nonCodPaid: boolean;
     notes?: string;
+    podPhotos?: Array<{
+        url: string;
+        fileId?: string;
+        uploadedAt: string;
+        uploadedBy: string;
+    }>;
+    auditLog?: Array<{
+        event: string;
+        at: string;
+        actorType: "ADMIN" | "COURIER" | "SYSTEM";
+        actorId: string;
+        meta?: Record<string, unknown>;
+    }>;
 }
 
 export interface Courier {
@@ -63,6 +112,12 @@ export interface Courier {
     wa: string;
     aktif: boolean;
     online: boolean;
+    // Telegram integration fields
+    telegramUserId?: number;
+    telegramChatId?: number;
+    telegramUsername?: string;
+    pairingCode?: string;
+    pairingCodeExpiresAt?: string;
 }
 
 export interface CODHistory {
@@ -546,6 +601,48 @@ export const SERVICE_TYPE_PRICING = {
 
 // Status badge configuration with colors
 export const ORDER_STATUS_CONFIG = {
+    // New statuses
+    NEW: {
+        label: "Order Baru",
+        color: "bg-gray-100 text-gray-800",
+    },
+    OFFERED: {
+        label: "Ditawarkan ke Kurir",
+        color: "bg-purple-100 text-purple-800",
+    },
+    ACCEPTED: {
+        label: "Diterima Kurir",
+        color: "bg-blue-100 text-blue-800",
+    },
+    REJECTED: {
+        label: "Ditolak Kurir",
+        color: "bg-red-100 text-red-800",
+    },
+    OTW_PICKUP: {
+        label: "OTW Jemput",
+        color: "bg-amber-100 text-amber-800",
+    },
+    PICKED: {
+        label: "Sudah Dijemput",
+        color: "bg-yellow-100 text-yellow-800",
+    },
+    OTW_DROPOFF: {
+        label: "OTW Antar",
+        color: "bg-orange-100 text-orange-800",
+    },
+    NEED_POD: {
+        label: "Butuh Foto POD",
+        color: "bg-pink-100 text-pink-800",
+    },
+    DELIVERED: {
+        label: "Terkirim",
+        color: "bg-green-100 text-green-800",
+    },
+    CANCELLED: {
+        label: "Dibatalkan",
+        color: "bg-gray-100 text-gray-600",
+    },
+    // Legacy statuses (backward compatibility)
     BARU: {
         label: "Menunggu Kurir",
         color: "bg-gray-100 text-gray-800",
@@ -618,15 +715,24 @@ export async function updateOrderStatus(
     const orders = await getOrders();
     const order = orders.find((order) => order.id === orderId);
     if (!order) return false;
-    // Define allowed status transitions for couriers
-    const courierAllowedTransitions: Record<
-        Order["status"],
-        Order["status"][]
-    > = {
-        BARU: [],  // Kurir cannot change from BARU
-        ASSIGNED: ["PICKUP"],
-        PICKUP: ["DIKIRIM"],
-        DIKIRIM: ["SELESAI"],
+    // Define allowed status transitions for couriers (new state machine)
+    const courierAllowedTransitions: Partial<Record<Order["status"], Order["status"][]>> = {
+        // New statuses
+        NEW: [],           // Kurir cannot act on NEW orders
+        OFFERED: ["ACCEPTED", "REJECTED"],
+        ACCEPTED: ["OTW_PICKUP"],
+        OTW_PICKUP: ["PICKED"],
+        PICKED: ["OTW_DROPOFF"],
+        OTW_DROPOFF: ["NEED_POD"],
+        NEED_POD: ["DELIVERED"],
+        DELIVERED: [],
+        REJECTED: [],
+        CANCELLED: [],
+        // Legacy statuses (backward compatibility)
+        BARU: [],          // Kurir cannot change from BARU
+        ASSIGNED: ["OTW_PICKUP", "PICKUP"],
+        PICKUP: ["OTW_DROPOFF", "DIKIRIM"],
+        DIKIRIM: ["NEED_POD", "SELESAI"],
         SELESAI: [],
     };
     // Check if courier can make this transition

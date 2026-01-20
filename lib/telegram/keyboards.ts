@@ -156,28 +156,50 @@ export function getTaskActions(orderId: string): InlineKeyboardMarkup {
     };
 }
 
-// Status update buttons
-export function getStatusUpdateKeyboard(orderId: string, currentStatus: OrderStatusType): InlineKeyboardMarkup {
+// Status update buttons - NEW STATE MACHINE
+export function getStatusUpdateKeyboard(orderId: string, currentStatus: string): InlineKeyboardMarkup {
     const buttons: InlineKeyboardButton[][] = [];
 
     // Show relevant next status options based on current status
-    if (currentStatus === 'MENUNGGU' || currentStatus === 'PICKUP_OTW') {
-        buttons.push([{ text: '📍 Sampai di Mitra', callback_data: `status_${orderId}_BARANG_DIAMBIL` }]);
-    }
-    if (currentStatus === 'BARANG_DIAMBIL') {
-        buttons.push([{ text: '🚚 OTW ke Customer', callback_data: `status_${orderId}_DIKIRIM` }]);
-    }
-    if (currentStatus === 'DIKIRIM') {
-        buttons.push([
-            { text: '✅ Pesanan Selesai', callback_data: `status_${orderId}_SELESAI` },
-        ]);
-        buttons.push([
-            { text: '❌ Gagal Antar', callback_data: `status_${orderId}_GAGAL` },
-        ]);
+    switch (currentStatus) {
+        case 'OFFERED':
+            buttons.push([
+                { text: '✅ Terima', callback_data: `rk:accept:${orderId}` },
+                { text: '❌ Tolak', callback_data: `rk:reject:${orderId}` },
+            ]);
+            break;
+        case 'ACCEPTED':
+        case 'ASSIGNED':
+            buttons.push([{ text: '🚚 OTW Jemput', callback_data: `rk:status:${orderId}:OTW_PICKUP` }]);
+            break;
+        case 'OTW_PICKUP':
+            buttons.push([{ text: '📦 Sudah Jemput', callback_data: `rk:status:${orderId}:PICKED` }]);
+            break;
+        case 'PICKED':
+        case 'PICKUP':
+        case 'BARANG_DIAMBIL':
+            buttons.push([{ text: '🏃 OTW Antar', callback_data: `rk:status:${orderId}:OTW_DROPOFF` }]);
+            break;
+        case 'OTW_DROPOFF':
+        case 'DIKIRIM':
+            buttons.push([{ text: '✅ Terkirim', callback_data: `rk:status:${orderId}:NEED_POD` }]);
+            break;
+        case 'NEED_POD':
+            buttons.push([{ text: '📸 Upload Foto POD', callback_data: `rk:pod:${orderId}` }]);
+            break;
+        // Legacy support
+        case 'MENUNGGU':
+        case 'PICKUP_OTW':
+            buttons.push([{ text: '📍 Sampai di Pickup', callback_data: `rk:status:${orderId}:PICKED` }]);
+            break;
     }
 
-    buttons.push([{ text: '📸 Upload Bukti Foto', callback_data: `upload_${orderId}` }]);
-    buttons.push([{ text: '← Kembali', callback_data: 'kurir_tasks' }]);
+    // Add issue reporting button for active orders
+    if (!['DELIVERED', 'SELESAI', 'REJECTED', 'CANCELLED', 'NEW', 'BARU', 'OFFERED'].includes(currentStatus)) {
+        buttons.push([{ text: '⚠️ Laporkan Kendala', callback_data: `rk:issue:${orderId}` }]);
+    }
+
+    buttons.push([{ text: '← Kembali ke Menu', callback_data: 'kurir_menu' }]);
 
     return { inline_keyboard: buttons };
 }
@@ -228,6 +250,105 @@ export function getPaginationKeyboard(
         inline_keyboard: [
             buttons,
             [{ text: '← Kembali', callback_data: 'kurir_menu' }],
+        ],
+    };
+}
+
+// ============================================
+// NEW: JOB CARD & PAIRING KEYBOARDS
+// ============================================
+
+// Job Card keyboard for OFFERED orders
+export function getJobCardKeyboard(orderId: string, pickupMaps?: string, dropoffMaps?: string): InlineKeyboardMarkup {
+    const buttons: InlineKeyboardButton[][] = [
+        [
+            { text: '✅ Terima Order', callback_data: `rk:accept:${orderId}` },
+            { text: '❌ Tolak', callback_data: `rk:reject_reason:${orderId}` },
+        ],
+    ];
+
+    // Add navigation buttons if maps links available
+    if (pickupMaps || dropoffMaps) {
+        const navButtons: InlineKeyboardButton[] = [];
+        if (pickupMaps) {
+            navButtons.push({ text: '📍 Maps Pickup', url: pickupMaps });
+        }
+        if (dropoffMaps) {
+            navButtons.push({ text: '📍 Maps Dropoff', url: dropoffMaps });
+        }
+        buttons.push(navButtons);
+    }
+
+    return { inline_keyboard: buttons };
+}
+
+// Reject reason selection keyboard
+export function getRejectReasonKeyboard(orderId: string): InlineKeyboardMarkup {
+    return {
+        inline_keyboard: [
+            [{ text: '🚫 Jarak terlalu jauh', callback_data: `rk:reject:${orderId}:jarak` }],
+            [{ text: '📦 Sudah banyak order', callback_data: `rk:reject:${orderId}:sibuk` }],
+            [{ text: '🏥 Kondisi tidak fit', callback_data: `rk:reject:${orderId}:sakit` }],
+            [{ text: '🔧 Kendaraan bermasalah', callback_data: `rk:reject:${orderId}:kendaraan` }],
+            [{ text: '❓ Alasan lain', callback_data: `rk:reject:${orderId}:lain` }],
+            [{ text: '← Batal', callback_data: `rk:detail:${orderId}` }],
+        ],
+    };
+}
+
+// Issue type selection keyboard
+export function getIssueTypeKeyboard(orderId: string): InlineKeyboardMarkup {
+    return {
+        inline_keyboard: [
+            [{ text: '📍 Alamat tidak ditemukan', callback_data: `rk:issue_send:${orderId}:alamat` }],
+            [{ text: '📞 Customer tidak bisa dihubungi', callback_data: `rk:issue_send:${orderId}:kontak` }],
+            [{ text: '📦 Barang rusak/hilang', callback_data: `rk:issue_send:${orderId}:barang` }],
+            [{ text: '🚗 Kendala transportasi', callback_data: `rk:issue_send:${orderId}:transportasi` }],
+            [{ text: '❓ Kendala lainnya', callback_data: `rk:issue_send:${orderId}:lain` }],
+            [{ text: '← Batal', callback_data: `rk:detail:${orderId}` }],
+        ],
+    };
+}
+
+// Order list keyboard (for /orders command)
+export function getOrderListKeyboard(orders: Array<{ id: string; shortId: string; status: string }>): InlineKeyboardMarkup {
+    const buttons: InlineKeyboardButton[][] = orders.slice(0, 5).map(order => {
+        const statusEmoji = getStatusEmoji(order.status);
+        return [{ text: `${statusEmoji} #${order.shortId}`, callback_data: `rk:detail:${order.id}` }];
+    });
+
+    buttons.push([{ text: '← Kembali ke Menu', callback_data: 'kurir_menu' }]);
+
+    return { inline_keyboard: buttons };
+}
+
+// Helper to get status emoji
+function getStatusEmoji(status: string): string {
+    const emojiMap: Record<string, string> = {
+        OFFERED: '📩',
+        ACCEPTED: '✅',
+        OTW_PICKUP: '🚚',
+        PICKED: '📦',
+        OTW_DROPOFF: '🏃',
+        NEED_POD: '📸',
+        DELIVERED: '🎉',
+        REJECTED: '❌',
+        CANCELLED: '🚫',
+        // Legacy
+        ASSIGNED: '✅',
+        PICKUP: '📦',
+        DIKIRIM: '🏃',
+        SELESAI: '🎉',
+    };
+    return emojiMap[status] || '📋';
+}
+
+// Pairing confirmation keyboard
+export function getPairingKeyboard(): InlineKeyboardMarkup {
+    return {
+        inline_keyboard: [
+            [{ text: '🔗 Masukkan Kode OTP', callback_data: 'rk:pairing:enter' }],
+            [{ text: '❓ Cara mendapatkan kode?', callback_data: 'rk:pairing:help' }],
         ],
     };
 }

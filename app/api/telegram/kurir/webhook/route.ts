@@ -22,6 +22,12 @@ import {
     getWalletKeyboard,
     getBackButton,
     getPaginationKeyboard,
+    // New keyboards for updated flow
+    getJobCardKeyboard,
+    getRejectReasonKeyboard,
+    getIssueTypeKeyboard,
+    getOrderListKeyboard,
+    getPairingKeyboard,
 } from '@/lib/telegram/keyboards';
 import {
     getKurirWelcomeMessage,
@@ -667,6 +673,115 @@ async function handleCallback(chatId: number, messageId: number, userId: number,
             { reply_markup: getBackButton('kurir_wallet') }
         );
     }
+
+    // ============================================
+    // NEW: rk: PREFIX CALLBACK HANDLERS
+    // ============================================
+
+    // rk:accept:orderId - Accept order
+    else if (data.startsWith('rk:accept:')) {
+        const orderId = data.split(':')[2];
+        await handleRkAccept(chatId, messageId, kurir, orderId);
+    }
+
+    // rk:reject_reason:orderId - Show reject reasons
+    else if (data.startsWith('rk:reject_reason:')) {
+        const orderId = data.split(':')[2];
+        await editMessageText(
+            botToken,
+            chatId,
+            messageId,
+            `❌ <b>TOLAK ORDER</b>\n\nPilih alasan penolakan:`,
+            { reply_markup: getRejectReasonKeyboard(orderId) }
+        );
+    }
+
+    // rk:reject:orderId:reason - Reject order with reason
+    else if (data.startsWith('rk:reject:')) {
+        const parts = data.split(':');
+        const orderId = parts[2];
+        const reason = parts[3] || 'tidak disebutkan';
+        await handleRkReject(chatId, messageId, kurir, orderId, reason);
+    }
+
+    // rk:status:orderId:newStatus - Update order status
+    else if (data.startsWith('rk:status:')) {
+        const parts = data.split(':');
+        const orderId = parts[2];
+        const newStatus = parts[3];
+        await handleRkStatusUpdate(chatId, messageId, kurir, orderId, newStatus);
+    }
+
+    // rk:pod:orderId - Request POD upload
+    else if (data.startsWith('rk:pod:')) {
+        const orderId = data.split(':')[2];
+        userState.set(userId, { action: 'upload_pod', orderId });
+        await editMessageText(
+            botToken,
+            chatId,
+            messageId,
+            `📸 <b>UPLOAD BUKTI PENGIRIMAN (POD)</b>\n\n` +
+            `Kirim foto bukti pengiriman untuk order ini.\n\n` +
+            `📷 Cukup kirim foto ke chat ini.\n\n` +
+            `<i>Foto akan otomatis tersimpan.</i>`,
+            { reply_markup: getBackButton('kurir_tasks') }
+        );
+    }
+
+    // rk:issue:orderId - Show issue options
+    else if (data.startsWith('rk:issue:')) {
+        const orderId = data.split(':')[2];
+        await editMessageText(
+            botToken,
+            chatId,
+            messageId,
+            `⚠️ <b>LAPORKAN KENDALA</b>\n\nPilih jenis kendala:`,
+            { reply_markup: getIssueTypeKeyboard(orderId) }
+        );
+    }
+
+    // rk:issue_send:orderId:type - Send issue report
+    else if (data.startsWith('rk:issue_send:')) {
+        const parts = data.split(':');
+        const orderId = parts[2];
+        const issueType = parts[3];
+        await handleRkIssue(chatId, messageId, kurir, orderId, issueType);
+    }
+
+    // rk:detail:orderId - Show order detail
+    else if (data.startsWith('rk:detail:')) {
+        const orderId = data.split(':')[2];
+        await handleRkOrderDetail(chatId, messageId, kurir, orderId);
+    }
+
+    // rk:pairing:enter - Enter pairing mode
+    else if (data === 'rk:pairing:enter') {
+        userState.set(userId, { action: 'enter_pairing_code' });
+        await editMessageText(
+            botToken,
+            chatId,
+            messageId,
+            `🔗 <b>PAIRING AKUN</b>\n\n` +
+            `Masukkan kode OTP 6 digit yang didapat dari Admin:\n\n` +
+            `<i>Ketik kode langsung di chat ini.</i>`,
+            { reply_markup: getBackButton('kurir_menu') }
+        );
+    }
+
+    // rk:pairing:help - Show pairing help
+    else if (data === 'rk:pairing:help') {
+        await editMessageText(
+            botToken,
+            chatId,
+            messageId,
+            `❓ <b>CARA MENDAPATKAN KODE OTP</b>\n\n` +
+            `1. Hubungi Admin Rayo Kurir\n` +
+            `2. Minta Admin generate kode OTP untuk Anda\n` +
+            `3. Masukkan kode 6 digit tersebut di bot ini\n\n` +
+            `📱 Hubungi Admin: wa.me/6281234567890`,
+            { reply_markup: getPairingKeyboard() }
+        );
+    }
 }
 
 // ============================================
@@ -1034,3 +1149,392 @@ export async function GET() {
         message: 'Webhook is active',
     });
 }
+
+// ============================================
+// NEW: RK PREFIX HANDLER FUNCTIONS
+// ============================================
+
+// Handle rk:accept - Accept order
+async function handleRkAccept(chatId: number, messageId: number, kurir: any, orderId: string) {
+    const botToken = getKurirBotToken();
+
+    // Get order
+    const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+    if (orderError || !order) {
+        await editMessageText(botToken, chatId, messageId, '❌ Order tidak ditemukan.');
+        return;
+    }
+
+    // Validate order is assigned to this courier and status is OFFERED
+    if (order.kurirId !== kurir.id) {
+        await editMessageText(botToken, chatId, messageId, '❌ Order ini tidak ditugaskan ke Anda.');
+        return;
+    }
+
+    if (order.status !== 'OFFERED') {
+        await editMessageText(
+            botToken, chatId, messageId,
+            `❌ Order tidak bisa diterima. Status saat ini: ${order.status}`
+        );
+        return;
+    }
+
+    // Update order status to ACCEPTED
+    const now = new Date().toISOString();
+    const auditLog = order.auditLog || [];
+    auditLog.push({
+        event: 'ORDER_ACCEPTED',
+        at: now,
+        actorType: 'COURIER',
+        actorId: kurir.id,
+        meta: { telegramUserId: kurir.telegram_id },
+    });
+
+    const { error: updateError } = await supabase
+        .from('orders')
+        .update({ status: 'ACCEPTED', auditLog })
+        .eq('id', orderId);
+
+    if (updateError) {
+        await editMessageText(botToken, chatId, messageId, '❌ Gagal menerima order. Coba lagi.');
+        return;
+    }
+
+    // Notify admin
+    const adminBotToken = getAdminBotToken();
+    const adminChatId = getAdminChatId();
+    await sendTelegramMessage(
+        adminBotToken,
+        adminChatId,
+        `✅ <b>ORDER DITERIMA</b>\n\n` +
+        `Order: <code>#${orderId.slice(-6)}</code>\n` +
+        `Kurir: ${kurir.name}\n` +
+        `Status: ACCEPTED`
+    );
+
+    await editMessageText(
+        botToken,
+        chatId,
+        messageId,
+        `✅ <b>ORDER DITERIMA!</b>\n\n` +
+        `Order <code>#${orderId.slice(-6)}</code> berhasil diterima.\n\n` +
+        `Klik tombol di bawah saat mulai perjalanan ke lokasi pickup.`,
+        { reply_markup: getStatusUpdateKeyboard(orderId, 'ACCEPTED') }
+    );
+}
+
+// Handle rk:reject - Reject order
+async function handleRkReject(chatId: number, messageId: number, kurir: any, orderId: string, reason: string) {
+    const botToken = getKurirBotToken();
+
+    // Get order
+    const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+    if (orderError || !order) {
+        await editMessageText(botToken, chatId, messageId, '❌ Order tidak ditemukan.');
+        return;
+    }
+
+    // Validate
+    if (order.kurirId !== kurir.id) {
+        await editMessageText(botToken, chatId, messageId, '❌ Order ini tidak ditugaskan ke Anda.');
+        return;
+    }
+
+    if (order.status !== 'OFFERED') {
+        await editMessageText(
+            botToken, chatId, messageId,
+            `❌ Order tidak bisa ditolak. Status saat ini: ${order.status}`
+        );
+        return;
+    }
+
+    // Reason labels
+    const reasonLabels: Record<string, string> = {
+        jarak: 'Jarak terlalu jauh',
+        sibuk: 'Sudah banyak order',
+        sakit: 'Kondisi tidak fit',
+        kendaraan: 'Kendaraan bermasalah',
+        lain: 'Alasan lain',
+    };
+
+    // Update order status to NEW (return to pool)
+    const now = new Date().toISOString();
+    const auditLog = order.auditLog || [];
+    auditLog.push({
+        event: 'ORDER_REJECTED',
+        at: now,
+        actorType: 'COURIER',
+        actorId: kurir.id,
+        meta: { telegramUserId: kurir.telegram_id, reason: reasonLabels[reason] || reason },
+    });
+
+    const { error: updateError } = await supabase
+        .from('orders')
+        .update({ status: 'NEW', kurirId: null, auditLog })
+        .eq('id', orderId);
+
+    if (updateError) {
+        await editMessageText(botToken, chatId, messageId, '❌ Gagal menolak order. Coba lagi.');
+        return;
+    }
+
+    // Notify admin
+    const adminBotToken = getAdminBotToken();
+    const adminChatId = getAdminChatId();
+    await sendTelegramMessage(
+        adminBotToken,
+        adminChatId,
+        `⚠️ <b>ORDER DITOLAK</b>\n\n` +
+        `Order: <code>#${orderId.slice(-6)}</code>\n` +
+        `Kurir: ${kurir.name}\n` +
+        `Alasan: ${reasonLabels[reason] || reason}\n\n` +
+        `<i>Order kembali ke pool, perlu di-assign ulang.</i>`
+    );
+
+    await editMessageText(
+        botToken,
+        chatId,
+        messageId,
+        `❌ <b>ORDER DITOLAK</b>\n\n` +
+        `Order <code>#${orderId.slice(-6)}</code> ditolak.\n` +
+        `Alasan: ${reasonLabels[reason] || reason}\n\n` +
+        `Admin akan mencari kurir lain.`,
+        { reply_markup: getBackButton('kurir_menu') }
+    );
+}
+
+// Handle rk:status - Update order status
+async function handleRkStatusUpdate(chatId: number, messageId: number, kurir: any, orderId: string, newStatus: string) {
+    const botToken = getKurirBotToken();
+
+    // Get order
+    const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+    if (orderError || !order) {
+        await editMessageText(botToken, chatId, messageId, '❌ Order tidak ditemukan.');
+        return;
+    }
+
+    // Validate order is assigned to this courier
+    if (order.kurirId !== kurir.id) {
+        await editMessageText(botToken, chatId, messageId, '❌ Order ini tidak ditugaskan ke Anda.');
+        return;
+    }
+
+    // Allowed transitions
+    const allowedTransitions: Record<string, string[]> = {
+        ACCEPTED: ['OTW_PICKUP'],
+        OTW_PICKUP: ['PICKED'],
+        PICKED: ['OTW_DROPOFF'],
+        OTW_DROPOFF: ['NEED_POD'],
+        NEED_POD: ['DELIVERED'],
+        // Legacy
+        ASSIGNED: ['OTW_PICKUP', 'PICKUP'],
+        PICKUP: ['OTW_DROPOFF', 'DIKIRIM'],
+        DIKIRIM: ['NEED_POD', 'SELESAI'],
+    };
+
+    const allowed = allowedTransitions[order.status] || [];
+    if (!allowed.includes(newStatus)) {
+        await editMessageText(
+            botToken, chatId, messageId,
+            `❌ Transisi status tidak valid.\nDari ${order.status} hanya bisa ke: ${allowed.join(', ') || 'tidak ada'}`
+        );
+        return;
+    }
+
+    // Update order status
+    const now = new Date().toISOString();
+    const auditLog = order.auditLog || [];
+    auditLog.push({
+        event: `STATUS_${newStatus}`,
+        at: now,
+        actorType: 'COURIER',
+        actorId: kurir.id,
+        meta: { telegramUserId: kurir.telegram_id, previousStatus: order.status },
+    });
+
+    const { error: updateError } = await supabase
+        .from('orders')
+        .update({ status: newStatus, auditLog })
+        .eq('id', orderId);
+
+    if (updateError) {
+        await editMessageText(botToken, chatId, messageId, '❌ Gagal update status. Coba lagi.');
+        return;
+    }
+
+    // Status labels
+    const statusLabels: Record<string, string> = {
+        OTW_PICKUP: '🚚 OTW Jemput',
+        PICKED: '📦 Sudah Jemput',
+        OTW_DROPOFF: '🏃 OTW Antar',
+        NEED_POD: '✅ Terkirim - Butuh POD',
+        DELIVERED: '🎉 Selesai',
+    };
+
+    // Notify admin
+    const adminBotToken = getAdminBotToken();
+    const adminChatId = getAdminChatId();
+    await sendTelegramMessage(
+        adminBotToken,
+        adminChatId,
+        `📝 <b>UPDATE STATUS</b>\n\n` +
+        `Order: <code>#${orderId.slice(-6)}</code>\n` +
+        `Kurir: ${kurir.name}\n` +
+        `Status: ${statusLabels[newStatus] || newStatus}`
+    );
+
+    await editMessageText(
+        botToken,
+        chatId,
+        messageId,
+        `✅ <b>STATUS DIUPDATE</b>\n\n` +
+        `Order <code>#${orderId.slice(-6)}</code>\n` +
+        `Status: ${statusLabels[newStatus] || newStatus}`,
+        { reply_markup: getStatusUpdateKeyboard(orderId, newStatus) }
+    );
+}
+
+// Handle rk:issue - Report issue
+async function handleRkIssue(chatId: number, messageId: number, kurir: any, orderId: string, issueType: string) {
+    const botToken = getKurirBotToken();
+
+    // Issue type labels
+    const issueLabels: Record<string, string> = {
+        alamat: 'Alamat tidak ditemukan',
+        kontak: 'Customer tidak bisa dihubungi',
+        barang: 'Barang rusak/hilang',
+        transportasi: 'Kendala transportasi',
+        lain: 'Kendala lainnya',
+    };
+
+    // Get order
+    const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+    if (orderError || !order) {
+        await editMessageText(botToken, chatId, messageId, '❌ Order tidak ditemukan.');
+        return;
+    }
+
+    // Add to audit log
+    const now = new Date().toISOString();
+    const auditLog = order.auditLog || [];
+    auditLog.push({
+        event: 'ISSUE_REPORTED',
+        at: now,
+        actorType: 'COURIER',
+        actorId: kurir.id,
+        meta: {
+            telegramUserId: kurir.telegram_id,
+            issueType: issueLabels[issueType] || issueType,
+            orderStatus: order.status,
+        },
+    });
+
+    await supabase
+        .from('orders')
+        .update({ auditLog })
+        .eq('id', orderId);
+
+    // Notify admin
+    const adminBotToken = getAdminBotToken();
+    const adminChatId = getAdminChatId();
+    await sendTelegramMessage(
+        adminBotToken,
+        adminChatId,
+        `⚠️ <b>KENDALA DILAPORKAN</b>\n\n` +
+        `Order: <code>#${orderId.slice(-6)}</code>\n` +
+        `Kurir: ${kurir.name}\n` +
+        `Kendala: ${issueLabels[issueType] || issueType}\n` +
+        `Status: ${order.status}\n\n` +
+        `<i>Segera hubungi kurir untuk tindak lanjut.</i>`
+    );
+
+    await editMessageText(
+        botToken,
+        chatId,
+        messageId,
+        `⚠️ <b>KENDALA DILAPORKAN</b>\n\n` +
+        `Order: <code>#${orderId.slice(-6)}</code>\n` +
+        `Kendala: ${issueLabels[issueType] || issueType}\n\n` +
+        `Admin akan segera menghubungi Anda.`,
+        { reply_markup: getStatusUpdateKeyboard(orderId, order.status) }
+    );
+}
+
+// Handle rk:detail - Show order detail
+async function handleRkOrderDetail(chatId: number, messageId: number, kurir: any, orderId: string) {
+    const botToken = getKurirBotToken();
+
+    // Get order
+    const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+    if (orderError || !order) {
+        await editMessageText(botToken, chatId, messageId, '❌ Order tidak ditemukan.');
+        return;
+    }
+
+    // Build order detail message
+    const hasCOD = order.cod?.isCOD || order.bayarOngkir === 'COD';
+    const codAmount = order.cod?.nominal || 0;
+    const talanganAmount = order.danaTalangan || 0;
+
+    let message = `📦 <b>DETAIL ORDER</b>\n\n`;
+    message += `📋 Order: <code>#${orderId.slice(-6)}</code>\n`;
+    message += `📊 Status: <b>${order.status}</b>\n\n`;
+
+    message += `👤 <b>Pengirim</b>\n`;
+    message += `   ${order.pengirim?.nama || order.customer_name || '-'}\n`;
+    message += `   📱 ${order.pengirim?.wa || order.customer_phone || '-'}\n\n`;
+
+    message += `📍 <b>Pickup</b>\n`;
+    message += `   ${order.pickup?.alamat || order.pickup_address || '-'}\n\n`;
+
+    message += `🏁 <b>Dropoff</b>\n`;
+    message += `   ${order.dropoff?.alamat || order.customer_address || '-'}\n\n`;
+
+    message += `💰 <b>Keuangan</b>\n`;
+    message += `   Ongkir: ${formatCurrency(order.ongkir || order.delivery_fee || 0)}\n`;
+    if (talanganAmount > 0) {
+        message += `   Talangan: ${formatCurrency(talanganAmount)}\n`;
+    }
+    if (hasCOD && codAmount > 0) {
+        message += `   💵 COD: <b>${formatCurrency(codAmount)}</b>\n`;
+    }
+
+    if (order.notes) {
+        message += `\n📝 <b>Catatan</b>\n   ${order.notes}\n`;
+    }
+
+    await editMessageText(
+        botToken,
+        chatId,
+        messageId,
+        message,
+        { reply_markup: getStatusUpdateKeyboard(orderId, order.status) }
+    );
+}
+

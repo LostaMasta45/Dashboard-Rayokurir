@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
                     // Simple route with start and end
                     const start = `${waypoints[0].lng},${waypoints[0].lat}`
                     const end = `${waypoints[1].lng},${waypoints[1].lat}`
-                    const url = `https://api.openrouteservice.org/v2/directions/driving-car?start=${start}&end=${end}`
+                    const url = `https://api.openrouteservice.org/v2/directions/cycling-regular?start=${start}&end=${end}`
 
                     console.log("Calling ORS GET API:", url)
 
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
                     console.log("Calling ORS POST API with coordinates:", JSON.stringify(orsCoordinates))
 
                     orsResponse = await fetch(
-                        `https://api.openrouteservice.org/v2/directions/driving-car/geojson`,
+                        `https://api.openrouteservice.org/v2/directions/cycling-regular/geojson`,
                         {
                             method: "POST",
                             headers: {

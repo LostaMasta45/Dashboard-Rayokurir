@@ -132,50 +132,85 @@ export function KurirDashboard({ user, viewMode }: KurirDashboardProps) {
     const stats = {
         total: courierOrders.length,
         menunggu: courierOrders.filter(
-            (order) => order.status === "BARU"
+            (order) => ["NEW", "OFFERED", "BARU"].includes(order.status)
         ).length,
         otw: courierOrders.filter((order) =>
-            ["ASSIGNED", "PICKUP", "DIKIRIM"].includes(
+            ["ACCEPTED", "OTW_PICKUP", "PICKED", "OTW_DROPOFF", "NEED_POD", "ASSIGNED", "PICKUP", "DIKIRIM"].includes(
                 order.status
             )
         ).length,
-        selesai: courierOrders.filter((order) => order.status === "SELESAI")
+        selesai: courierOrders.filter((order) => ["DELIVERED", "SELESAI"].includes(order.status))
             .length,
         codOutstanding: courierOrders
-            .filter((order) => order.cod.isCOD && !order.cod.codPaid)
-            .reduce((sum, order) => sum + order.cod.nominal, 0),
+            .filter((order) => order.cod?.isCOD && !order.cod?.codPaid)
+            .reduce((sum, order) => sum + (order.cod?.nominal || 0), 0),
     };
 
     const getStatusBadge = (status: Order["status"]) => {
         switch (status) {
+            case "NEW":
             case "BARU":
-                return <Badge variant="secondary">Menunggu</Badge>;
+                return <Badge variant="secondary">Baru</Badge>;
+            case "OFFERED":
+                return (
+                    <Badge className="bg-purple-500 hover:bg-purple-600">
+                        Ditawarkan
+                    </Badge>
+                );
+            case "ACCEPTED":
             case "ASSIGNED":
                 return (
                     <Badge className="bg-blue-500 hover:bg-blue-600">
-                        Ditugaskan
+                        Diterima
                     </Badge>
                 );
+            case "OTW_PICKUP":
+                return (
+                    <Badge className="bg-amber-500 hover:bg-amber-600">
+                        OTW Jemput
+                    </Badge>
+                );
+            case "PICKED":
             case "PICKUP":
                 return (
                     <Badge className="bg-yellow-500 hover:bg-yellow-600">
-                        Diambil
+                        Sudah Jemput
                     </Badge>
                 );
+            case "OTW_DROPOFF":
             case "DIKIRIM":
                 return (
                     <Badge className="bg-orange-500 hover:bg-orange-600">
-                        Dikirim
+                        OTW Antar
                     </Badge>
                 );
+            case "NEED_POD":
+                return (
+                    <Badge className="bg-pink-500 hover:bg-pink-600">
+                        Butuh Foto POD
+                    </Badge>
+                );
+            case "DELIVERED":
             case "SELESAI":
                 return (
                     <Badge className="bg-green-500 hover:bg-green-600">
                         Selesai
                     </Badge>
                 );
+            case "REJECTED":
+                return (
+                    <Badge className="bg-red-500 hover:bg-red-600">
+                        Ditolak
+                    </Badge>
+                );
+            case "CANCELLED":
+                return (
+                    <Badge className="bg-gray-500 hover:bg-gray-600">
+                        Dibatalkan
+                    </Badge>
+                );
             default:
-                return null;
+                return <Badge variant="outline">{status}</Badge>;
         }
     };
 
@@ -198,51 +233,96 @@ export function KurirDashboard({ user, viewMode }: KurirDashboardProps) {
 
     const getActionButton = (order: Order) => {
         switch (order.status) {
+            case "NEW":
             case "BARU":
                 return (
                     <span className="text-xs sm:text-sm text-gray-500 font-medium">
-                        Menunggu Kurir
+                        Menunggu Assign
                     </span>
                 );
+            case "OFFERED":
+                return (
+                    <div className="flex gap-2">
+                        <Button
+                            size="sm"
+                            onClick={() => handleStatusUpdate(order.id, "ACCEPTED" as Order["status"])}
+                            className="bg-green-500 hover:bg-green-600 text-xs sm:text-sm"
+                        >
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Terima
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleStatusUpdate(order.id, "REJECTED" as Order["status"])}
+                            className="text-xs sm:text-sm"
+                        >
+                            <X className="h-3 w-3 mr-1" />
+                            Tolak
+                        </Button>
+                    </div>
+                );
+            case "ACCEPTED":
             case "ASSIGNED":
                 return (
                     <Button
                         size="sm"
-                        onClick={() =>
-                            handleStatusUpdate(order.id, "PICKUP")
-                        }
+                        onClick={() => handleStatusUpdate(order.id, "OTW_PICKUP" as Order["status"])}
                         className="bg-amber-500 hover:bg-amber-600 text-xs sm:text-sm"
                     >
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Ambil Barang
+                        <Truck className="h-3 w-3 mr-1" />
+                        OTW Jemput
                     </Button>
                 );
+            case "OTW_PICKUP":
+                return (
+                    <Button
+                        size="sm"
+                        onClick={() => handleStatusUpdate(order.id, "PICKED" as Order["status"])}
+                        className="bg-yellow-500 hover:bg-yellow-600 text-xs sm:text-sm"
+                    >
+                        <Package className="h-3 w-3 mr-1" />
+                        Sudah Jemput
+                    </Button>
+                );
+            case "PICKED":
             case "PICKUP":
                 return (
                     <Button
                         size="sm"
-                        onClick={() =>
-                            handleStatusUpdate(order.id, "DIKIRIM")
-                        }
+                        onClick={() => handleStatusUpdate(order.id, "OTW_DROPOFF" as Order["status"])}
                         className="bg-orange-500 hover:bg-orange-600 text-xs sm:text-sm"
                     >
                         <Truck className="h-3 w-3 mr-1" />
-                        Mulai Kirim
+                        OTW Antar
                     </Button>
                 );
+            case "OTW_DROPOFF":
             case "DIKIRIM":
                 return (
                     <Button
                         size="sm"
-                        onClick={() => handleStatusUpdate(order.id, "SELESAI")}
-                        className="bg-green-500 hover:bg-green-600 text-xs sm:text-sm"
+                        onClick={() => handleStatusUpdate(order.id, "NEED_POD" as Order["status"])}
+                        className="bg-pink-500 hover:bg-pink-600 text-xs sm:text-sm"
                     >
                         <CheckCircle className="h-3 w-3 mr-1" />
-                        Selesai
+                        Terkirim
                     </Button>
                 );
+            case "NEED_POD":
+                return (
+                    <Button
+                        size="sm"
+                        onClick={() => handleOrderPhotoCapture(order)}
+                        className="bg-blue-500 hover:bg-blue-600 text-xs sm:text-sm animate-pulse"
+                    >
+                        <Camera className="h-3 w-3 mr-1" />
+                        Upload Foto POD
+                    </Button>
+                );
+            case "DELIVERED":
             case "SELESAI":
-                if (order.cod.isCOD && !order.cod.codPaid) {
+                if (order.cod?.isCOD && !order.cod?.codPaid) {
                     return (
                         <Button
                             size="sm"
@@ -255,8 +335,21 @@ export function KurirDashboard({ user, viewMode }: KurirDashboardProps) {
                     );
                 }
                 return (
-                    <span className="text-xs sm:text-sm text-green-600 font-medium">
+                    <span className="text-xs sm:text-sm text-green-600 font-medium flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" />
                         Selesai
+                    </span>
+                );
+            case "REJECTED":
+                return (
+                    <span className="text-xs sm:text-sm text-red-500 font-medium">
+                        Ditolak
+                    </span>
+                );
+            case "CANCELLED":
+                return (
+                    <span className="text-xs sm:text-sm text-gray-500 font-medium">
+                        Dibatalkan
                     </span>
                 );
             default:
@@ -264,13 +357,16 @@ export function KurirDashboard({ user, viewMode }: KurirDashboardProps) {
         }
     };
 
-    // Sort orders: MENUNGGU first, then OTW, then SELESAI
+    // Sort orders: OFFERED first, then active, then completed
     const sortedOrders = courierOrders.sort((a, b) => {
         const getScore = (s: string) => {
-            if (s === "BARU") return 0;
-            if (["ASSIGNED", "PICKUP", "DIKIRIM"].includes(s)) return 1;
-            if (s === "SELESAI") return 2;
-            return 3;
+            if (["OFFERED"].includes(s)) return 0; // Butuh respon cepat
+            if (["NEED_POD"].includes(s)) return 1; // Butuh upload foto
+            if (["ACCEPTED", "OTW_PICKUP", "PICKED", "OTW_DROPOFF", "ASSIGNED", "PICKUP", "DIKIRIM"].includes(s)) return 2;
+            if (["NEW", "BARU"].includes(s)) return 3;
+            if (["DELIVERED", "SELESAI"].includes(s)) return 4;
+            if (["REJECTED", "CANCELLED"].includes(s)) return 5;
+            return 6;
         };
         return getScore(a.status) - getScore(b.status);
     });
@@ -449,11 +545,15 @@ export function KurirDashboard({ user, viewMode }: KurirDashboardProps) {
                             }}
                         >
                             {/* Status Stripe */}
-                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${order.status === 'BARU' ? 'bg-gray-300' :
-                                order.status === 'ASSIGNED' ? 'bg-blue-500' :
-                                    order.status === 'PICKUP' ? 'bg-yellow-500' :
-                                        order.status === 'DIKIRIM' ? 'bg-orange-500' :
-                                            'bg-green-500'
+                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${['NEW', 'BARU'].includes(order.status) ? 'bg-gray-300' :
+                                order.status === 'OFFERED' ? 'bg-purple-500' :
+                                    ['ACCEPTED', 'ASSIGNED'].includes(order.status) ? 'bg-blue-500' :
+                                        order.status === 'OTW_PICKUP' ? 'bg-amber-500' :
+                                            ['PICKED', 'PICKUP'].includes(order.status) ? 'bg-yellow-500' :
+                                                ['OTW_DROPOFF', 'DIKIRIM'].includes(order.status) ? 'bg-orange-500' :
+                                                    order.status === 'NEED_POD' ? 'bg-pink-500' :
+                                                        ['DELIVERED', 'SELESAI'].includes(order.status) ? 'bg-green-500' :
+                                                            'bg-gray-400'
                                 }`} />
 
                             <div className="flex justify-between items-start pl-2">

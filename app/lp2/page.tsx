@@ -9,7 +9,7 @@ import { Menu, X, CheckCircle, Package, Truck, DollarSign, MessageCircle, MapPin
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence, Variants } from "framer-motion"
 import { InfiniteMarquee, LiveNotification, TypewriterText } from "@/components/lp2"
-import { OngkirCalculatorV2 } from "@/components/ongkir"
+import { OngkirCalculatorWithMap } from "@/components/ongkir"
 
 export default function LandingPageLP2() {
     const [isOpen, setIsOpen] = useState(false)
@@ -438,7 +438,7 @@ export default function LandingPageLP2() {
 
                     {/* Ongkir Calculator Widget */}
                     <div className="mt-16 max-w-lg mx-auto">
-                        <OngkirCalculatorV2 compact={true} />
+                        <OngkirCalculatorWithMap compact={true} />
                     </div>
                 </div>
             </section>
