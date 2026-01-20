@@ -183,21 +183,61 @@ export function OrdersPage() {
                 label: "Menunggu Kurir",
                 color: "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700",
             },
+            NEW: {
+                label: "Menunggu Kurir",
+                color: "bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700",
+            },
             ASSIGNED: {
                 label: "Ditugaskan",
+                color: "bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800",
+            },
+            OFFERED: {
+                label: "Ditawarkan",
+                color: "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
+            },
+            ACCEPTED: {
+                label: "Diterima Kurir",
                 color: "bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800",
             },
             PICKUP: {
                 label: "Diambil",
                 color: "bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800",
             },
+            OTW_PICKUP: {
+                label: "OTW Jemput",
+                color: "bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+            },
+            PICKED: {
+                label: "Sudah Jemput",
+                color: "bg-amber-100 dark:bg-amber-900/50 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800",
+            },
             DIKIRIM: {
                 label: "Dikirim",
+                color: "bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200 border-orange-200 dark:border-orange-800",
+            },
+            OTW_DROPOFF: {
+                label: "OTW Antar",
+                color: "bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200 border-orange-200 dark:border-orange-800",
+            },
+            NEED_POD: {
+                label: "Menunggu Bukti",
                 color: "bg-orange-100 dark:bg-orange-900/50 text-orange-800 dark:text-orange-200 border-orange-200 dark:border-orange-800",
             },
             SELESAI: {
                 label: "Selesai",
                 color: "bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 border-green-200 dark:border-green-800",
+            },
+            DELIVERED: {
+                label: "Selesai",
+                color: "bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-200 border-green-200 dark:border-green-800",
+            },
+            CANCELLED: {
+                label: "Dibatalkan",
+                color: "bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 border-red-200 dark:border-red-800",
+            },
+            REJECTED: {
+                label: "Ditolak",
+                color: "bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 border-red-200 dark:border-red-800",
             },
         };
         const config = statusConfig[status] || statusConfig.BARU;
@@ -691,7 +731,7 @@ export function OrdersPage() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <div className="overflow-x-auto rounded-md border border-gray-200 dark:border-gray-800">
+                        <div className="w-full max-w-full overflow-x-auto rounded-md border border-gray-200 dark:border-gray-800">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors">

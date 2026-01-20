@@ -332,7 +332,24 @@ export function AddOrderModal({
 
             await saveOrder(newOrder);
 
+            // Push notification to courier's Telegram if assigned
             const actualKurirId = (formData.kurirId && formData.kurirId !== "no-assign") ? formData.kurirId : null;
+            if (actualKurirId) {
+                try {
+                    const pushRes = await fetch('/api/telegram/kurir/push-order', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ orderId: newOrder.id, courierId: actualKurirId }),
+                    });
+                    const pushData = await pushRes.json();
+                    if (!pushData.ok) {
+                        console.warn('[push-order] Warning:', pushData.error);
+                    }
+                } catch (pushError) {
+                    console.error('[push-order] Error:', pushError);
+                }
+            }
+
             const courierName = actualKurirId ? couriers.find(c => c.id === actualKurirId)?.nama : null;
             toast.success(courierName
                 ? `Order berhasil ditambahkan dan di-assign ke ${courierName}!`
@@ -461,7 +478,24 @@ export function AddOrderModal({
 
             await saveOrder(newOrder);
 
+            // Push notification to courier's Telegram if assigned
             const actualKurirId = (formData.kurirId && formData.kurirId !== "no-assign") ? formData.kurirId : null;
+            if (actualKurirId) {
+                try {
+                    const pushRes = await fetch('/api/telegram/kurir/push-order', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ orderId: newOrder.id, courierId: actualKurirId }),
+                    });
+                    const pushData = await pushRes.json();
+                    if (!pushData.ok) {
+                        console.warn('[push-order] Warning:', pushData.error);
+                    }
+                } catch (pushError) {
+                    console.error('[push-order] Error:', pushError);
+                }
+            }
+
             const courierName = actualKurirId ? couriers.find(c => c.id === actualKurirId)?.nama : null;
             toast.success(courierName
                 ? `Order berhasil di-assign ke ${courierName}! Lanjut ke order berikutnya.`
