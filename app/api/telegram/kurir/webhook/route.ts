@@ -148,9 +148,9 @@ async function handleStart(chatId: number, telegramId: number, firstName: string
 
     // Check if kurir is registered
     const { data: kurir } = await supabase
-        .from('kurir')
+        .from('couriers')
         .select('*')
-        .eq('telegram_id', telegramId)
+        .eq('telegram_user_id', telegramId)
         .single();
 
     if (!kurir) {
@@ -173,9 +173,9 @@ async function handleStart(chatId: number, telegramId: number, firstName: string
 
     const kurirData = {
         id: kurir.id,
-        name: kurir.name,
-        phone: kurir.phone,
-        isOnline: kurir.is_online,
+        name: kurir.nama,
+        phone: kurir.wa,
+        isOnline: kurir.online,
         totalOrders: kurir.total_orders || 0,
         rating: kurir.rating || 5.0,
     };
@@ -184,7 +184,7 @@ async function handleStart(chatId: number, telegramId: number, firstName: string
         botToken,
         chatId,
         getKurirWelcomeMessage(kurirData, stats.todayOrders, stats.todayEarnings, stats.pendingCOD),
-        { reply_markup: getKurirMainMenu(kurir.is_online) }
+        { reply_markup: getKurirMainMenu(kurir.online) }
     );
 }
 
@@ -193,9 +193,9 @@ async function handleMenu(chatId: number, telegramId: number) {
     const botToken = getKurirBotToken();
 
     const { data: kurir } = await supabase
-        .from('kurir')
+        .from('couriers')
         .select('*')
-        .eq('telegram_id', telegramId)
+        .eq('telegram_user_id', telegramId)
         .single();
 
     if (!kurir) {
@@ -210,9 +210,9 @@ async function handleMenu(chatId: number, telegramId: number) {
     const stats = await getKurirStats(kurir.id);
     const kurirData = {
         id: kurir.id,
-        name: kurir.name,
-        phone: kurir.phone,
-        isOnline: kurir.is_online,
+        name: kurir.nama,
+        phone: kurir.wa,
+        isOnline: kurir.online,
         totalOrders: kurir.total_orders || 0,
         rating: kurir.rating || 5.0,
     };
@@ -221,7 +221,7 @@ async function handleMenu(chatId: number, telegramId: number) {
         botToken,
         chatId,
         getKurirWelcomeMessage(kurirData, stats.todayOrders, stats.todayEarnings, stats.pendingCOD),
-        { reply_markup: getKurirMainMenu(kurir.is_online) }
+        { reply_markup: getKurirMainMenu(kurir.online) }
     );
 }
 
@@ -230,9 +230,9 @@ async function handleTasks(chatId: number, telegramId: number) {
     const botToken = getKurirBotToken();
 
     const { data: kurir } = await supabase
-        .from('kurir')
+        .from('couriers')
         .select('id')
-        .eq('telegram_id', telegramId)
+        .eq('telegram_user_id', telegramId)
         .single();
 
     if (!kurir) return;
@@ -287,9 +287,9 @@ async function handleWallet(chatId: number, telegramId: number) {
     const botToken = getKurirBotToken();
 
     const { data: kurir } = await supabase
-        .from('kurir')
+        .from('couriers')
         .select('*')
-        .eq('telegram_id', telegramId)
+        .eq('telegram_user_id', telegramId)
         .single();
 
     if (!kurir) return;
@@ -311,9 +311,9 @@ async function handleWallet(chatId: number, telegramId: number) {
 
     const kurirData = {
         id: kurir.id,
-        name: kurir.name,
-        phone: kurir.phone,
-        isOnline: kurir.is_online,
+        name: kurir.nama,
+        phone: kurir.wa,
+        isOnline: kurir.online,
         totalOrders: kurir.total_orders || 0,
         rating: kurir.rating || 5.0,
     };
@@ -331,9 +331,9 @@ async function handleOnlineStatus(chatId: number, telegramId: number, isOnline: 
     const botToken = getKurirBotToken();
 
     const { error } = await supabase
-        .from('kurir')
-        .update({ is_online: isOnline, updated_at: new Date().toISOString() })
-        .eq('telegram_id', telegramId);
+        .from('couriers')
+        .update({ online: isOnline, updated_at: new Date().toISOString() })
+        .eq('telegram_user_id', telegramId);
 
     if (error) {
         await sendTelegramMessage(botToken, chatId, '❌ Gagal mengubah status. Coba lagi.');
@@ -357,9 +357,9 @@ async function handleHistory(chatId: number, telegramId: number, page: number = 
     const offset = (page - 1) * limit;
 
     const { data: kurir } = await supabase
-        .from('kurir')
+        .from('couriers')
         .select('id')
-        .eq('telegram_id', telegramId)
+        .eq('telegram_user_id', telegramId)
         .single();
 
     if (!kurir) return;
@@ -405,9 +405,9 @@ async function handleRegister(chatId: number, telegramId: number, firstName: str
 
     // Check if already registered
     const { data: existing } = await supabase
-        .from('kurir')
+        .from('couriers')
         .select('id')
-        .eq('telegram_id', telegramId)
+        .eq('telegram_user_id', telegramId)
         .single();
 
     if (existing) {
@@ -500,9 +500,9 @@ async function handleCallback(chatId: number, messageId: number, userId: number,
 
     // Get kurir info
     const { data: kurir } = await supabase
-        .from('kurir')
+        .from('couriers')
         .select('*')
-        .eq('telegram_id', userId)
+        .eq('telegram_user_id', userId)
         .single();
 
     if (!kurir && data !== 'noop') {
@@ -515,9 +515,9 @@ async function handleCallback(chatId: number, messageId: number, userId: number,
         const stats = await getKurirStats(kurir.id);
         const kurirData = {
             id: kurir.id,
-            name: kurir.name,
-            phone: kurir.phone,
-            isOnline: kurir.is_online,
+            name: kurir.nama,
+            phone: kurir.wa,
+            isOnline: kurir.online,
             totalOrders: kurir.total_orders || 0,
             rating: kurir.rating || 5.0,
         };
@@ -527,7 +527,7 @@ async function handleCallback(chatId: number, messageId: number, userId: number,
             chatId,
             messageId,
             getKurirWelcomeMessage(kurirData, stats.todayOrders, stats.todayEarnings, stats.pendingCOD),
-            { reply_markup: getKurirMainMenu(kurir.is_online) }
+            { reply_markup: getKurirMainMenu(kurir.online) }
         );
     }
 
@@ -898,9 +898,9 @@ async function handleWalletCallback(chatId: number, messageId: number, kurir: an
 
     const kurirData = {
         id: kurir.id,
-        name: kurir.name,
-        phone: kurir.phone,
-        isOnline: kurir.is_online,
+        name: kurir.nama,
+        phone: kurir.wa,
+        isOnline: kurir.online,
         totalOrders: kurir.total_orders || 0,
         rating: kurir.rating || 5.0,
     };
@@ -918,15 +918,15 @@ async function handleOnlineToggle(chatId: number, messageId: number, kurir: any,
     const botToken = getKurirBotToken();
 
     await supabase
-        .from('kurir')
-        .update({ is_online: isOnline, updated_at: new Date().toISOString() })
+        .from('couriers')
+        .update({ online: isOnline, updated_at: new Date().toISOString() })
         .eq('id', kurir.id);
 
     const stats = await getKurirStats(kurir.id);
     const kurirData = {
         id: kurir.id,
-        name: kurir.name,
-        phone: kurir.phone,
+        name: kurir.nama,
+        phone: kurir.wa,
         isOnline: isOnline,
         totalOrders: kurir.total_orders || 0,
         rating: kurir.rating || 5.0,
@@ -1192,7 +1192,7 @@ async function handleRkAccept(chatId: number, messageId: number, kurir: any, ord
         at: now,
         actorType: 'COURIER',
         actorId: kurir.id,
-        meta: { telegramUserId: kurir.telegram_id },
+        meta: { telegramUserId: kurir.telegram_user_id },
     });
 
     const { error: updateError } = await supabase
@@ -1275,7 +1275,7 @@ async function handleRkReject(chatId: number, messageId: number, kurir: any, ord
         at: now,
         actorType: 'COURIER',
         actorId: kurir.id,
-        meta: { telegramUserId: kurir.telegram_id, reason: reasonLabels[reason] || reason },
+        meta: { telegramUserId: kurir.telegram_user_id, reason: reasonLabels[reason] || reason },
     });
 
     const { error: updateError } = await supabase
@@ -1365,7 +1365,7 @@ async function handleRkStatusUpdate(chatId: number, messageId: number, kurir: an
         at: now,
         actorType: 'COURIER',
         actorId: kurir.id,
-        meta: { telegramUserId: kurir.telegram_id, previousStatus: order.status },
+        meta: { telegramUserId: kurir.telegram_user_id, previousStatus: order.status },
     });
 
     const { error: updateError } = await supabase
@@ -1444,7 +1444,7 @@ async function handleRkIssue(chatId: number, messageId: number, kurir: any, orde
         actorType: 'COURIER',
         actorId: kurir.id,
         meta: {
-            telegramUserId: kurir.telegram_id,
+            telegramUserId: kurir.telegram_user_id,
             issueType: issueLabels[issueType] || issueType,
             orderStatus: order.status,
         },
