@@ -15,7 +15,15 @@ export async function GET(request: NextRequest) {
         const { data: couriers, error: couriersError } = await supabase
             .from('couriers')
             .select('*')
-            .limit(5);
+            .limit(10);
+
+        // Check orders with active statuses
+        const { data: activeOrders, error: ordersError } = await supabase
+            .from('orders')
+            .select('id, status, kurirId, pengirim, createdAt')
+            .in('status', ['OFFERED', 'ACCEPTED', 'OTW_PICKUP', 'PICKED', 'OTW_DROPOFF', 'NEED_POD', 'ASSIGNED', 'PICKUP', 'DIKIRIM'])
+            .order('createdAt', { ascending: false })
+            .limit(10);
 
         // Check if telegram_user_id column exists
         let columnsInfo = null;
@@ -48,9 +56,23 @@ export async function GET(request: NextRequest) {
             },
             database: {
                 couriersCount: couriers?.length || 0,
-                couriers: couriers,
+                couriers: couriers?.map(c => ({
+                    id: c.id,
+                    nama: c.nama,
+                    telegram_user_id: c.telegram_user_id,
+                    online: c.online,
+                    aktif: c.aktif,
+                })),
                 couriersError: couriersError?.message,
                 telegramUserIdColumn: columnsInfo,
+                ordersCount: activeOrders?.length || 0,
+                orders: activeOrders?.map(o => ({
+                    id: o.id,
+                    status: o.status,
+                    kurirId: o.kurirId,
+                    pengirim: o.pengirim?.nama,
+                })),
+                ordersError: ordersError?.message,
             },
             webhook: webhookInfo,
         });

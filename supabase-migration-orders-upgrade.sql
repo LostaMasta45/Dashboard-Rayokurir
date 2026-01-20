@@ -30,3 +30,41 @@ SELECT column_name, data_type
 FROM information_schema.columns 
 WHERE table_name = 'orders'
 ORDER BY ordinal_position;
+
+-- ========================================
+-- FIX CONSTRAINT: jenisOrder values mismatch
+-- ========================================
+-- The old constraint only allows: 'Barang', 'Makanan', 'Dokumen', 'Antar Jemput'
+-- The new form uses: 'Antar Barang', 'Jemput Barang', 'Titip Beli', 'Dokumen', 'Lainnya'
+
+-- Step 1: Drop the old constraint
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_jenisorder_check;
+
+-- Step 2: Add new constraint with updated values
+ALTER TABLE orders ADD CONSTRAINT orders_jenisorder_check 
+CHECK ("jenisOrder" IN ('Antar Barang', 'Jemput Barang', 'Titip Beli', 'Dokumen', 'Lainnya', 'Barang', 'Makanan', 'Antar Jemput'));
+
+-- ========================================
+-- FIX CONSTRAINT: serviceType (if needed)
+-- ========================================
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_servicetype_check;
+ALTER TABLE orders ADD CONSTRAINT orders_servicetype_check 
+CHECK ("serviceType" IN ('Regular', 'Express', 'Same Day', 'Reguler'));
+
+-- ========================================
+-- FIX CONSTRAINT: status (add new bot statuses)
+-- ========================================
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+ALTER TABLE orders ADD CONSTRAINT orders_status_check 
+CHECK (status IN (
+  'BARU', 'ASSIGNED', 'PICKUP', 'DIKIRIM', 'SELESAI',
+  'NEW', 'OFFERED', 'ACCEPTED', 'REJECTED', 
+  'OTW_PICKUP', 'PICKED', 'OTW_DROPOFF', 'NEED_POD', 'DELIVERED', 'CANCELLED'
+));
+
+-- ========================================
+-- Verify constraints
+-- ========================================
+SELECT conname, pg_get_constraintdef(oid) 
+FROM pg_constraint 
+WHERE conrelid = 'orders'::regclass;

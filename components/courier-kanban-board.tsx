@@ -34,52 +34,56 @@ interface CourierKanbanBoardProps {
 
 const KANBAN_COLUMNS = [
     {
-        id: "BARU",
-        title: "Menunggu Kurir",
-        shortTitle: "Baru",
+        id: "OFFERED",
+        title: "Ditawarkan",
+        shortTitle: "Offered",
         icon: Clock,
-        color: "from-gray-500 to-slate-600",
-        bgColor: "bg-gray-50 dark:bg-gray-800/50",
-        borderColor: "border-gray-200 dark:border-gray-700",
-        textColor: "text-gray-600 dark:text-gray-300",
-        tabBg: "bg-gray-100 dark:bg-gray-700",
-        tabActive: "bg-gray-500 text-white"
+        color: "from-purple-500 to-violet-600",
+        bgColor: "bg-purple-50 dark:bg-purple-800/50",
+        borderColor: "border-purple-200 dark:border-purple-700",
+        textColor: "text-purple-600 dark:text-purple-300",
+        tabBg: "bg-purple-100 dark:bg-purple-700",
+        tabActive: "bg-purple-500 text-white",
+        statuses: ["OFFERED", "NEW", "BARU"]  // Match multiple statuses
     },
     {
-        id: "ASSIGNED",
-        title: "Kurir Ditugaskan",
-        shortTitle: "Assigned",
+        id: "ACCEPTED",
+        title: "Diterima",
+        shortTitle: "Accepted",
         icon: Truck,
         color: "from-blue-500 to-cyan-500",
         bgColor: "bg-blue-50 dark:bg-blue-900/20",
         borderColor: "border-blue-200 dark:border-blue-800",
         textColor: "text-blue-600 dark:text-blue-400",
         tabBg: "bg-blue-100 dark:bg-blue-900/30",
-        tabActive: "bg-blue-500 text-white"
+        tabActive: "bg-blue-500 text-white",
+        statuses: ["ACCEPTED", "ASSIGNED", "OTW_PICKUP"]
     },
     {
-        id: "PICKUP",
-        title: "Barang Diambil",
-        shortTitle: "Pickup",
+        id: "PICKED",
+        title: "Sudah Jemput",
+        shortTitle: "Picked",
         icon: Package,
         color: "from-amber-500 to-yellow-500",
         bgColor: "bg-amber-50 dark:bg-amber-900/20",
         borderColor: "border-amber-200 dark:border-amber-800",
         textColor: "text-amber-600 dark:text-amber-400",
         tabBg: "bg-amber-100 dark:bg-amber-900/30",
-        tabActive: "bg-amber-500 text-white"
+        tabActive: "bg-amber-500 text-white",
+        statuses: ["PICKED", "PICKUP", "OTW_DROPOFF", "DIKIRIM"]
     },
     {
-        id: "DIKIRIM",
-        title: "Sedang Dikirim",
-        shortTitle: "Dikirim",
-        icon: Navigation,
-        color: "from-orange-500 to-red-500",
-        bgColor: "bg-orange-50 dark:bg-orange-900/20",
-        borderColor: "border-orange-200 dark:border-orange-800",
-        textColor: "text-orange-600 dark:text-orange-400",
-        tabBg: "bg-orange-100 dark:bg-orange-900/30",
-        tabActive: "bg-orange-500 text-white"
+        id: "NEED_POD",
+        title: "Butuh Foto POD",
+        shortTitle: "POD",
+        icon: Camera,
+        color: "from-pink-500 to-rose-500",
+        bgColor: "bg-pink-50 dark:bg-pink-900/20",
+        borderColor: "border-pink-200 dark:border-pink-800",
+        textColor: "text-pink-600 dark:text-pink-400",
+        tabBg: "bg-pink-100 dark:bg-pink-900/30",
+        tabActive: "bg-pink-500 text-white",
+        statuses: ["NEED_POD"]
     },
     {
         id: "SELESAI",
@@ -91,7 +95,8 @@ const KANBAN_COLUMNS = [
         borderColor: "border-emerald-200 dark:border-emerald-800",
         textColor: "text-emerald-600 dark:text-emerald-400",
         tabBg: "bg-emerald-100 dark:bg-emerald-900/30",
-        tabActive: "bg-emerald-500 text-white"
+        tabActive: "bg-emerald-500 text-white",
+        statuses: ["DELIVERED", "SELESAI"]
     },
 ];
 
@@ -106,30 +111,54 @@ export function CourierKanbanBoard({
     const [expandedCard, setExpandedCard] = useState<string | null>(null);
     const [mobileActiveTab, setMobileActiveTab] = useState(0);
 
-    const getOrdersByStatus = (status: string) => {
-        return orders.filter((order) => order.status === status);
+    const getOrdersByStatus = (column: typeof KANBAN_COLUMNS[0]) => {
+        return orders.filter((order) => column.statuses.includes(order.status));
     };
 
     const getNextStatus = (currentStatus: Order["status"]): Order["status"] | null => {
-        const statusFlow: Record<Order["status"], Order["status"] | null> = {
-            BARU: null,  // Kurir tidak bisa ubah dari BARU
+        const statusFlow: Partial<Record<Order["status"], Order["status"] | null>> = {
+            // New statuses
+            NEW: null,
+            OFFERED: null, // Need to accept/reject first
+            ACCEPTED: "OTW_PICKUP",
+            OTW_PICKUP: "PICKED",
+            PICKED: "OTW_DROPOFF",
+            OTW_DROPOFF: "NEED_POD",
+            NEED_POD: "DELIVERED",
+            DELIVERED: null,
+            REJECTED: null,
+            CANCELLED: null,
+            // Legacy statuses
+            BARU: null,
             ASSIGNED: "PICKUP",
             PICKUP: "DIKIRIM",
             DIKIRIM: "SELESAI",
             SELESAI: null,
         };
-        return statusFlow[currentStatus];
+        return statusFlow[currentStatus] ?? null;
     };
 
     const getActionLabel = (status: Order["status"]): string => {
-        const labels: Record<Order["status"], string> = {
+        const labels: Partial<Record<Order["status"], string>> = {
+            // New statuses
+            NEW: "Menunggu",
+            OFFERED: "Terima",
+            ACCEPTED: "OTW Jemput",
+            OTW_PICKUP: "Sudah Jemput",
+            PICKED: "OTW Antar",
+            OTW_DROPOFF: "Upload POD",
+            NEED_POD: "Upload POD",
+            DELIVERED: "Selesai",
+            REJECTED: "Ditolak",
+            CANCELLED: "Dibatalkan",
+            // Legacy statuses
             BARU: "Menunggu",
             ASSIGNED: "Ambil Barang",
             PICKUP: "Mulai Kirim",
             DIKIRIM: "Selesai",
             SELESAI: "Selesai",
         };
-        return labels[status];
+        return labels[status] ?? "Lanjut";
     };
 
     const handleQuickAction = (order: Order, e: React.MouseEvent) => {
@@ -328,7 +357,7 @@ export function CourierKanbanBoard({
                 {/* Mobile Tab Navigation */}
                 <div className="flex items-center gap-1 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4">
                     {KANBAN_COLUMNS.map((column, index) => {
-                        const columnOrders = getOrdersByStatus(column.id);
+                        const columnOrders = getOrdersByStatus(column);
                         const Icon = column.icon;
                         const isActive = mobileActiveTab === index;
 
@@ -398,7 +427,7 @@ export function CourierKanbanBoard({
                                     {KANBAN_COLUMNS[mobileActiveTab].title}
                                 </h3>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    {getOrdersByStatus(KANBAN_COLUMNS[mobileActiveTab].id).length} order
+                                    {getOrdersByStatus(KANBAN_COLUMNS[mobileActiveTab]).length} order
                                 </p>
                             </div>
                         </div>
@@ -406,14 +435,14 @@ export function CourierKanbanBoard({
 
                     {/* Order Cards */}
                     <div className="space-y-3">
-                        {getOrdersByStatus(KANBAN_COLUMNS[mobileActiveTab].id).length === 0 ? (
+                        {getOrdersByStatus(KANBAN_COLUMNS[mobileActiveTab]).length === 0 ? (
                             <div className="text-center py-12 text-gray-400 dark:text-gray-500">
                                 <Package size={40} className="mx-auto mb-2 opacity-30" />
                                 <p className="text-sm">Tidak ada order</p>
                                 <p className="text-xs mt-1">Swipe untuk melihat status lain</p>
                             </div>
                         ) : (
-                            getOrdersByStatus(KANBAN_COLUMNS[mobileActiveTab].id).map((order) => (
+                            getOrdersByStatus(KANBAN_COLUMNS[mobileActiveTab]).map((order) => (
                                 <OrderCard key={order.id} order={order} column={KANBAN_COLUMNS[mobileActiveTab]} />
                             ))
                         )}
@@ -438,7 +467,7 @@ export function CourierKanbanBoard({
             {/* ============ DESKTOP VIEW ============ */}
             <div className="hidden sm:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 {KANBAN_COLUMNS.map((column) => {
-                    const columnOrders = getOrdersByStatus(column.id);
+                    const columnOrders = getOrdersByStatus(column);
                     const Icon = column.icon;
 
                     return (

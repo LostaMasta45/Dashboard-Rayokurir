@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { CourierCODDepositModal } from "@/components/courier-cod-deposit-modal";
 import { PhotoUploadModal } from "@/components/photo-upload-modal";
+import { PODUploadModal } from "@/components/pod-upload-modal";
 import { CourierBottomNav } from "@/components/courier-bottom-nav";
 import { CourierKanbanBoard } from "@/components/courier-kanban-board";
 import { CourierStats } from "@/components/courier-stats";
@@ -47,6 +48,7 @@ export function KurirDashboard({ user, viewMode }: KurirDashboardProps) {
     const [orders, setOrders] = useState<Order[]>([]);
     const [showCODModal, setShowCODModal] = useState(false);
     const [showPhotoModal, setShowPhotoModal] = useState(false);
+    const [showPODModal, setShowPODModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
     const [showOrderDetail, setShowOrderDetail] = useState(false);
     const [orderViewMode, setOrderViewMode] = useState<"list" | "kanban">("kanban");
@@ -375,10 +377,10 @@ export function KurirDashboard({ user, viewMode }: KurirDashboardProps) {
     // Filter photos for this courier
     const myPhotos = uploadedPhotos.filter((p) => p.kurirId === user.courierId);
 
-    // Handle photo capture for specific order
+    // Handle photo capture for specific order (POD upload)
     const handleOrderPhotoCapture = (order: Order) => {
         setSelectedOrder(order);
-        setShowPhotoModal(true);
+        setShowPODModal(true);
     };
 
     // NEW: CONTENT SECTIONS
@@ -892,6 +894,18 @@ export function KurirDashboard({ user, viewMode }: KurirDashboardProps) {
                 courierId={user.courierId!}
                 courierName={user.name}
                 onPhotoUploaded={handlePhotoUploaded}
+            />
+
+            <PODUploadModal
+                isOpen={showPODModal}
+                onClose={() => setShowPODModal(false)}
+                order={selectedOrder}
+                courierId={user.courierId!}
+                onUploaded={async () => {
+                    const data = await getOrders();
+                    setOrders(data);
+                    setShowPODModal(false);
+                }}
             />
 
             {/* Order Detail Modal */}

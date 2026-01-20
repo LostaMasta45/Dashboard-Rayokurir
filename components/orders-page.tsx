@@ -731,7 +731,7 @@ export function OrdersPage() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <div className="w-full max-w-full overflow-x-auto rounded-md border border-gray-200 dark:border-gray-800">
+                        <div className="grid w-full max-w-[calc(100vw-40px)] lg:max-w-full overflow-x-auto rounded-md border border-gray-200 dark:border-gray-800 pb-2">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors">

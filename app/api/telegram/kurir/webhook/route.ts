@@ -229,20 +229,34 @@ async function handleMenu(chatId: number, telegramId: number) {
 async function handleTasks(chatId: number, telegramId: number) {
     const botToken = getKurirBotToken();
 
-    const { data: kurir } = await supabase
+    console.log('[handleTasks] telegramId:', telegramId);
+
+    const { data: kurir, error: kurirError } = await supabase
         .from('couriers')
-        .select('id')
+        .select('id, nama, telegram_user_id')
         .eq('telegram_user_id', telegramId)
         .single();
 
-    if (!kurir) return;
+    console.log('[handleTasks] kurir:', kurir, 'error:', kurirError);
 
-    const { data: orders } = await supabase
+    if (!kurir) {
+        await sendTelegramMessage(
+            botToken,
+            chatId,
+            '⛔ Akun belum terhubung dengan sistem.\n\nHubungi admin untuk pairing akun.'
+        );
+        return;
+    }
+
+    // Query orders assigned to this courier with active statuses
+    const { data: orders, error: ordersError } = await supabase
         .from('orders')
         .select('*')
-        .eq('kurir_id', kurir.id)
-        .in('status', ['PICKUP_OTW', 'BARANG_DIAMBIL', 'DIKIRIM'])
-        .order('created_at', { ascending: false });
+        .eq('kurirId', kurir.id)
+        .in('status', ['OFFERED', 'ACCEPTED', 'OTW_PICKUP', 'PICKED', 'OTW_DROPOFF', 'NEED_POD', 'ASSIGNED', 'PICKUP', 'DIKIRIM'])
+        .order('createdAt', { ascending: false });
+
+    console.log('[handleTasks] kurirId:', kurir.id, 'orders found:', orders?.length, 'error:', ordersError);
 
     if (!orders?.length) {
         await sendTelegramMessage(
@@ -255,22 +269,25 @@ async function handleTasks(chatId: number, telegramId: number) {
     }
 
     for (const order of orders) {
+        // Map from database columns (camelCase) to message format
         const orderData = {
             id: order.id,
-            orderNumber: order.order_number,
-            mitraName: order.mitra_name || 'Mitra',
-            mitraAddress: order.pickup_address || '',
-            customerName: order.customer_name,
-            customerPhone: order.customer_phone,
-            customerAddress: order.customer_address,
-            items: order.items || [],
-            subtotal: order.subtotal,
-            deliveryFee: order.delivery_fee,
-            total: order.total,
-            codAmount: order.cod_amount,
-            notes: order.notes,
+            orderNumber: order.id.slice(-6).toUpperCase(), // Use last 6 chars of ID as order number
+            mitraName: order.pengirim?.nama || 'Pengirim',
+            mitraAddress: order.pickup?.alamat || '',
+            customerName: order.pengirim?.nama || 'Pelanggan',
+            customerPhone: order.pengirim?.wa || '',
+            customerAddress: order.dropoff?.alamat || '',
+            items: [],
+            subtotal: order.ongkir || 0,
+            deliveryFee: order.ongkir || 0,
+            total: (order.ongkir || 0) + (order.cod?.nominal || 0),
+            codAmount: order.cod?.nominal || 0,
+            notes: order.notes || '',
             status: order.status as OrderStatusType,
-            createdAt: new Date(order.created_at),
+            createdAt: new Date(order.createdAt),
+            pickupMapsLink: order.pickup?.mapsLink,
+            dropoffMapsLink: order.dropoff?.mapsLink,
         };
 
         await sendTelegramMessage(
@@ -299,14 +316,14 @@ async function handleWallet(chatId: number, telegramId: number) {
     // Get pending COD orders
     const { data: pendingOrders } = await supabase
         .from('orders')
-        .select('order_number, cod_amount')
-        .eq('kurir_id', kurir.id)
+        .select('id, cod')
+        .eq('kurirId', kurir.id)
         .eq('status', 'SELESAI')
-        .eq('cod_collected', false);
+        .eq('codSettled', false);
 
     const pending = pendingOrders?.map((o) => ({
-        orderNumber: o.order_number,
-        amount: o.cod_amount || 0,
+        orderNumber: o.id?.slice(-6).toUpperCase() || '',
+        amount: o.cod?.nominal || 0,
     })) || [];
 
     const kurirData = {
@@ -367,9 +384,9 @@ async function handleHistory(chatId: number, telegramId: number, page: number = 
     const { data: orders, count } = await supabase
         .from('orders')
         .select('*', { count: 'exact' })
-        .eq('kurir_id', kurir.id)
-        .in('status', ['SELESAI', 'GAGAL'])
-        .order('updated_at', { ascending: false })
+        .eq('kurirId', kurir.id)
+        .in('status', ['SELESAI', 'DELIVERED'])
+        .order('createdAt', { ascending: false })
         .range(offset, offset + limit - 1);
 
     if (!orders?.length) {
@@ -384,8 +401,8 @@ async function handleHistory(chatId: number, telegramId: number, page: number = 
 
     const historyList = orders
         .map((o) => {
-            const emoji = o.status === 'SELESAI' ? '✅' : '❌';
-            return `${emoji} <code>${o.order_number}</code>\n   ${o.customer_name} - ${formatCurrency(o.total)}`;
+            const emoji = o.status === 'SELESAI' || o.status === 'DELIVERED' ? '✅' : '❌';
+            return `${emoji} <code>${o.id?.slice(-6).toUpperCase() || ''}</code>\n   ${o.pengirim?.nama || o.dropoff?.nama || 'Customer'} - ${formatCurrency(o.ongkir + (o.cod?.nominal || 0))}`;
         })
         .join('\n\n');
 
@@ -448,12 +465,12 @@ async function handlePhotoUpload(chatId: number, userId: number, fileId: string)
         return;
     }
 
-    // Save photo to order (in real implementation, would upload to storage first)
+    // Save photo to order
     const { error } = await supabase
         .from('orders')
         .update({
-            proof_photos: [fileId], // In real app, would be array of photo URLs
-            updated_at: new Date().toISOString(),
+            podPhotos: [fileId], // Store Telegram file_id for POD
+            status: 'DELIVERED', // Mark as delivered when POD uploaded
         })
         .eq('id', state.orderId);
 
@@ -471,7 +488,7 @@ async function handlePhotoUpload(chatId: number, userId: number, fileId: string)
 
     const { data: order } = await supabase
         .from('orders')
-        .select('order_number')
+        .select('*')
         .eq('id', state.orderId)
         .single();
 
@@ -479,8 +496,9 @@ async function handlePhotoUpload(chatId: number, userId: number, fileId: string)
         adminBotToken,
         adminChatId,
         `📸 <b>BUKTI FOTO DITERIMA</b>\n\n` +
-        `Order: <code>${order?.order_number}</code>\n` +
-        `Kurir telah mengupload bukti pengiriman.`
+        `Order: <code>#${state.orderId.slice(-6)}</code>\n` +
+        `Kurir telah mengupload bukti pengiriman.\n` +
+        `Status: ✅ DELIVERED`
     );
 
     await sendTelegramMessage(
@@ -794,9 +812,9 @@ async function handleTasksCallback(chatId: number, messageId: number, kurirId: s
     const { data: orders } = await supabase
         .from('orders')
         .select('*')
-        .eq('kurir_id', kurirId)
-        .in('status', ['PICKUP_OTW', 'BARANG_DIAMBIL', 'DIKIRIM'])
-        .order('created_at', { ascending: false })
+        .eq('kurirId', kurirId)
+        .in('status', ['OFFERED', 'ACCEPTED', 'OTW_PICKUP', 'PICKED', 'OTW_DROPOFF', 'NEED_POD', 'ASSIGNED', 'PICKUP', 'DIKIRIM'])
+        .order('createdAt', { ascending: false })
         .limit(1);
 
     if (!orders?.length) {
@@ -813,20 +831,22 @@ async function handleTasksCallback(chatId: number, messageId: number, kurirId: s
     const order = orders[0];
     const orderData = {
         id: order.id,
-        orderNumber: order.order_number,
-        mitraName: order.mitra_name || 'Mitra',
-        mitraAddress: order.pickup_address || '',
-        customerName: order.customer_name,
-        customerPhone: order.customer_phone,
-        customerAddress: order.customer_address,
-        items: order.items || [],
-        subtotal: order.subtotal,
-        deliveryFee: order.delivery_fee,
-        total: order.total,
-        codAmount: order.cod_amount,
-        notes: order.notes,
+        orderNumber: order.id.slice(-6).toUpperCase(),
+        mitraName: order.pengirim?.nama || 'Pengirim',
+        mitraAddress: order.pickup?.alamat || '',
+        customerName: order.dropoff?.nama || order.pengirim?.nama || 'Pelanggan',
+        customerPhone: order.pengirim?.wa || '',
+        customerAddress: order.dropoff?.alamat || '',
+        items: [],
+        subtotal: order.ongkir || 0,
+        deliveryFee: order.ongkir || 0,
+        total: (order.ongkir || 0) + (order.cod?.nominal || 0),
+        codAmount: order.cod?.nominal || 0,
+        notes: order.notes || '',
         status: order.status as OrderStatusType,
-        createdAt: new Date(order.created_at),
+        createdAt: new Date(order.createdAt),
+        pickupMapsLink: order.pickup?.mapsLink,
+        dropoffMapsLink: order.dropoff?.mapsLink,
     };
 
     await editMessageText(
@@ -846,9 +866,9 @@ async function handleHistoryCallback(chatId: number, messageId: number, kurirId:
     const { data: orders, count } = await supabase
         .from('orders')
         .select('*', { count: 'exact' })
-        .eq('kurir_id', kurirId)
-        .in('status', ['SELESAI', 'GAGAL'])
-        .order('updated_at', { ascending: false })
+        .eq('kurirId', kurirId)
+        .in('status', ['SELESAI', 'DELIVERED'])
+        .order('createdAt', { ascending: false })
         .range(offset, offset + limit - 1);
 
     if (!orders?.length) {
@@ -864,8 +884,8 @@ async function handleHistoryCallback(chatId: number, messageId: number, kurirId:
 
     const historyList = orders
         .map((o) => {
-            const emoji = o.status === 'SELESAI' ? '✅' : '❌';
-            return `${emoji} <code>${o.order_number}</code>\n   ${o.customer_name} - ${formatCurrency(o.total)}`;
+            const emoji = o.status === 'SELESAI' || o.status === 'DELIVERED' ? '✅' : '❌';
+            return `${emoji} <code>${o.id?.slice(-6).toUpperCase() || ''}</code>\n   ${o.pengirim?.nama || o.dropoff?.nama || 'Customer'} - ${formatCurrency((o.ongkir || 0) + (o.cod?.nominal || 0))}`;
         })
         .join('\n\n');
 
@@ -886,14 +906,14 @@ async function handleWalletCallback(chatId: number, messageId: number, kurir: an
 
     const { data: pendingOrders } = await supabase
         .from('orders')
-        .select('order_number, cod_amount')
-        .eq('kurir_id', kurir.id)
+        .select('id, cod')
+        .eq('kurirId', kurir.id)
         .eq('status', 'SELESAI')
-        .eq('cod_collected', false);
+        .eq('codSettled', false);
 
     const pending = pendingOrders?.map((o) => ({
-        orderNumber: o.order_number,
-        amount: o.cod_amount || 0,
+        orderNumber: o.id?.slice(-6).toUpperCase() || '',
+        amount: o.cod?.nominal || 0,
     })) || [];
 
     const kurirData = {
@@ -969,9 +989,8 @@ async function handleAcceptTask(chatId: number, messageId: number, kurir: any, o
     const { error } = await supabase
         .from('orders')
         .update({
-            kurir_id: kurir.id,
-            status: 'PICKUP_OTW',
-            updated_at: new Date().toISOString(),
+            kurirId: kurir.id,
+            status: 'ACCEPTED',
         })
         .eq('id', orderId);
 
@@ -1001,9 +1020,9 @@ async function handleAcceptTask(chatId: number, messageId: number, kurir: any, o
             adminBotToken,
             adminChatId,
             `✅ <b>TUGAS DITERIMA</b>\n\n` +
-            `Order: <code>${order.order_number}</code>\n` +
-            `Kurir: <b>${kurir.name}</b>\n` +
-            `Status: 🚚 OTW ke Pickup`
+            `Order: <code>#${orderId.slice(-6)}</code>\n` +
+            `Kurir: <b>${kurir.nama}</b>\n` +
+            `Status: ✅ ACCEPTED`
         );
     }
 
@@ -1012,9 +1031,9 @@ async function handleAcceptTask(chatId: number, messageId: number, kurir: any, o
         chatId,
         messageId,
         `✅ <b>TUGAS DITERIMA!</b>\n\n` +
-        `Order: <code>${order?.order_number}</code>\n\n` +
+        `Order: <code>#${orderId.slice(-6)}</code>\n\n` +
         `Segera menuju lokasi pickup!`,
-        { reply_markup: getStatusUpdateKeyboard(orderId, 'PICKUP_OTW') }
+        { reply_markup: getStatusUpdateKeyboard(orderId, 'ACCEPTED') }
     );
 }
 
@@ -1037,7 +1056,6 @@ async function handleStatusUpdate(chatId: number, messageId: number, orderId: st
         .from('orders')
         .update({
             status: newStatus,
-            updated_at: new Date().toISOString(),
         })
         .eq('id', orderId);
 
@@ -1069,26 +1087,26 @@ async function handleStatusUpdate(chatId: number, messageId: number, orderId: st
         adminBotToken,
         adminChatId,
         `${StatusEmoji[newStatus]} <b>STATUS UPDATE</b>\n\n` +
-        `Order: <code>${order.order_number}</code>\n` +
+        `Order: <code>#${orderId.slice(-6)}</code>\n` +
         `Status: <b>${StatusLabel[newStatus]}</b>`
     );
 
     const orderData = {
         id: order.id,
-        orderNumber: order.order_number,
-        mitraName: order.mitra_name || 'Mitra',
-        mitraAddress: order.pickup_address || '',
-        customerName: order.customer_name,
-        customerPhone: order.customer_phone,
-        customerAddress: order.customer_address,
-        items: order.items || [],
-        subtotal: order.subtotal,
-        deliveryFee: order.delivery_fee,
-        total: order.total,
-        codAmount: order.cod_amount,
-        notes: order.notes,
+        orderNumber: order.id.slice(-6).toUpperCase(),
+        mitraName: order.pengirim?.nama || 'Pengirim',
+        mitraAddress: order.pickup?.alamat || '',
+        customerName: order.dropoff?.nama || order.pengirim?.nama || 'Pelanggan',
+        customerPhone: order.pengirim?.wa || '',
+        customerAddress: order.dropoff?.alamat || '',
+        items: [],
+        subtotal: order.ongkir || 0,
+        deliveryFee: order.ongkir || 0,
+        total: (order.ongkir || 0) + (order.cod?.nominal || 0),
+        codAmount: order.cod?.nominal || 0,
+        notes: order.notes || '',
         status: newStatus,
-        createdAt: new Date(order.created_at),
+        createdAt: new Date(order.createdAt),
     };
 
     await editMessageText(
@@ -1115,24 +1133,24 @@ async function getKurirStats(kurirId: string) {
     // Get today's completed orders
     const { data: todayOrders } = await supabase
         .from('orders')
-        .select('delivery_fee, cod_amount, cod_collected')
-        .eq('kurir_id', kurirId)
-        .eq('status', 'SELESAI')
-        .gte('updated_at', today.toISOString());
+        .select('ongkir, cod, codSettled')
+        .eq('kurirId', kurirId)
+        .in('status', ['SELESAI', 'DELIVERED'])
+        .gte('createdAt', today.toISOString());
 
     const completed = todayOrders || [];
     const todayCount = completed.length;
-    const todayEarnings = completed.reduce((sum, o) => sum + (o.delivery_fee || 0), 0);
+    const todayEarnings = completed.reduce((sum, o) => sum + (o.ongkir || 0), 0);
 
     // Get pending COD
     const { data: pendingCODOrders } = await supabase
         .from('orders')
-        .select('cod_amount')
-        .eq('kurir_id', kurirId)
-        .eq('status', 'SELESAI')
-        .eq('cod_collected', false);
+        .select('cod')
+        .eq('kurirId', kurirId)
+        .in('status', ['SELESAI', 'DELIVERED'])
+        .eq('codSettled', false);
 
-    const pendingCOD = (pendingCODOrders || []).reduce((sum, o) => sum + (o.cod_amount || 0), 0);
+    const pendingCOD = (pendingCODOrders || []).reduce((sum, o) => sum + (o.cod?.nominal || 0), 0);
 
     return {
         todayOrders: todayCount,

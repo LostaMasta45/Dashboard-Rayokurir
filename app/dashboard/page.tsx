@@ -82,7 +82,7 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="flex min-h-screen bg-gray-50 dark:bg-background">
+        <div className="flex min-h-screen bg-gray-50 dark:bg-background overflow-x-hidden w-full">
             {/* Sidebar - For all users on desktop */}
             <Sidebar
                 currentPage={currentPage}
