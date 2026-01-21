@@ -362,26 +362,72 @@ export async function saveOrders(orders: Order[]): Promise<Order[] | null> {
 
 export async function getCouriers(): Promise<Courier[]> {
     const { data, error } = await supabase.from("couriers").select("*");
-    return data || [];
+    if (!data) return [];
+    // Map snake_case from DB to camelCase for TypeScript
+    return data.map((c: Record<string, unknown>) => ({
+        id: c.id as string,
+        nama: c.nama as string,
+        wa: c.wa as string,
+        aktif: c.aktif as boolean,
+        online: c.online as boolean,
+        telegramUserId: c.telegram_user_id as number | undefined,
+        telegramChatId: c.telegram_chat_id as number | undefined,
+        telegramUsername: c.telegram_username as string | undefined,
+        pairingCode: c.pairing_code as string | undefined,
+        pairingCodeExpiresAt: c.pairing_code_expires_at as string | undefined,
+    }));
 }
 
 export async function saveCourier(courier: Courier): Promise<Courier | null> {
+    // Map camelCase to snake_case for DB
+    const dbCourier = {
+        id: courier.id,
+        nama: courier.nama,
+        wa: courier.wa,
+        aktif: courier.aktif,
+        online: courier.online,
+        telegram_user_id: courier.telegramUserId,
+        telegram_chat_id: courier.telegramChatId,
+        telegram_username: courier.telegramUsername,
+        pairing_code: courier.pairingCode,
+        pairing_code_expires_at: courier.pairingCodeExpiresAt,
+    };
     const { data, error } = await supabase
         .from("couriers")
-        .insert([courier])
+        .insert([dbCourier])
         .select()
         .single();
-    return data || null;
+    if (!data) return null;
+    return {
+        ...courier,
+        telegramUserId: data.telegram_user_id,
+    };
 }
 
 export async function updateCourier(courier: Courier): Promise<Courier | null> {
+    // Map camelCase to snake_case for DB
+    const dbCourier = {
+        nama: courier.nama,
+        wa: courier.wa,
+        aktif: courier.aktif,
+        online: courier.online,
+        telegram_user_id: courier.telegramUserId,
+        telegram_chat_id: courier.telegramChatId,
+        telegram_username: courier.telegramUsername,
+        pairing_code: courier.pairingCode,
+        pairing_code_expires_at: courier.pairingCodeExpiresAt,
+    };
     const { data, error } = await supabase
         .from("couriers")
-        .update(courier)
+        .update(dbCourier)
         .eq("id", courier.id)
         .select()
         .single();
-    return data || null;
+    if (!data) return null;
+    return {
+        ...courier,
+        telegramUserId: data.telegram_user_id,
+    };
 }
 
 export async function getCODHistory(): Promise<CODHistory[]> {

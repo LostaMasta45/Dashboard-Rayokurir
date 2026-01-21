@@ -8,6 +8,8 @@ import { formatCurrency, deleteOrder, type Order, type Courier, updateOrder } fr
 import { toast } from "sonner";
 import { Clock, Zap, Package, MapPin, Phone, User, GripVertical, ChevronLeft, ChevronRight, Truck, CheckCircle, Navigation, Trash2 } from "lucide-react";
 import { OrderQuickStats } from "@/components/order-quick-stats";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface KanbanBoardProps {
     orders: Order[];
@@ -388,6 +390,11 @@ export function KanbanBoard({ orders, couriers, onOrderUpdated }: KanbanBoardPro
                     const columnOrders = getOrdersByStatus(column.status);
                     const isDragOver = dragOverStatus === column.status;
                     const Icon = column.icon;
+                    const isDoneColumn = column.status === "SELESAI";
+
+                    // For Done column, only show recent 5 initially
+                    const displayedOrders = isDoneColumn ? columnOrders.slice(0, 5) : columnOrders;
+                    const hasMore = isDoneColumn && columnOrders.length > 5;
 
                     return (
                         <div
@@ -416,15 +423,50 @@ export function KanbanBoard({ orders, couriers, onOrderUpdated }: KanbanBoardPro
                             {/* Column Body */}
                             <div className={`bg-gray-50/50 dark:bg-gray-900/40 rounded-b-xl p-2 min-h-[150px] max-h-[80vh] overflow-y-auto space-y-2 ${isDragOver ? "bg-blue-50/50 dark:bg-blue-900/40" : ""
                                 }`}>
-                                {columnOrders.length === 0 ? (
+                                {displayedOrders.length === 0 ? (
                                     <div className="text-center py-8 text-sm text-muted-foreground">
                                         <Package className="h-8 w-8 mx-auto mb-2 opacity-30" />
                                         <p>Tidak ada order</p>
                                     </div>
                                 ) : (
-                                    columnOrders.map((order) => (
-                                        <OrderCard key={order.id} order={order} column={column} />
-                                    ))
+                                    <>
+                                        {displayedOrders.map((order) => (
+                                            <OrderCard key={order.id} order={order} column={column} />
+                                        ))}
+
+                                        {hasMore && (
+                                            <Dialog>
+                                                <DialogTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        className="w-full text-xs font-medium text-muted-foreground hover:text-foreground border border-dashed border-gray-300 dark:border-gray-700 h-9"
+                                                    >
+                                                        Lihat Semua ({columnOrders.length})
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
+                                                    <DialogHeader>
+                                                        <DialogTitle className="flex items-center gap-2">
+                                                            <CheckCircle className="h-5 w-5 text-green-600" />
+                                                            Riwayat Order Selesai
+                                                            <Badge variant="secondary" className="ml-2">
+                                                                {columnOrders.length} Order
+                                                            </Badge>
+                                                        </DialogTitle>
+                                                    </DialogHeader>
+                                                    <div className="flex-1 overflow-hidden min-h-0 bg-gray-50/50 dark:bg-gray-900/20 rounded-md border mt-2">
+                                                        <ScrollArea className="h-full p-4">
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                                {columnOrders.map((order) => (
+                                                                    <OrderCard key={order.id} order={order} column={column} />
+                                                                ))}
+                                                            </div>
+                                                        </ScrollArea>
+                                                    </div>
+                                                </DialogContent>
+                                            </Dialog>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </div>

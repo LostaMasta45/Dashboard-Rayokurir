@@ -16,7 +16,7 @@ interface SidebarProps {
 
 export function Sidebar({ currentPage, onPageChange, onLogout, userRole }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const { setTheme, theme, resolvedTheme } = useTheme()
+  const { setTheme, theme } = useTheme()
 
   const adminMenuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -26,6 +26,7 @@ export function Sidebar({ currentPage, onPageChange, onLogout, userRole }: Sideb
     { id: "mitra", label: "Mitra", icon: Store },
     { id: "database", label: "Database", icon: Database },
     { id: "reports", label: "Laporan", icon: BarChart3 },
+    { id: "pod", label: "Bukti Pengiriman", icon: Camera },
   ]
 
   const kurirMenuItems = [
@@ -43,48 +44,44 @@ export function Sidebar({ currentPage, onPageChange, onLogout, userRole }: Sideb
   return (
     <>
       {/* Mobile menu button */}
-      {/* Mobile menu button (Hidden for Kurir who uses BottomNav) */}
       {userRole !== "KURIR" && (
         <Button
           variant="ghost"
           size="icon"
-          className="fixed top-3 left-3 z-50 lg:hidden bg-white dark:bg-gray-900 shadow-lg border border-border hover:bg-gray-50 dark:hover:bg-gray-800 h-10 w-10 sm:h-12 sm:w-12 sm:top-4 sm:left-4"
+          className="fixed top-3 left-3 z-50 lg:hidden bg-white/80 dark:bg-gray-900/80 backdrop-blur-md shadow-sm border border-border h-10 w-10 sm:h-12 sm:w-12 rounded-xl"
           onClick={toggleSidebar}
         >
-          {isOpen ? <X className="h-4 w-4 sm:h-5 sm:w-5" /> : <Menu className="h-4 w-4 sm:h-5 sm:w-5" />}
+          {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>
       )}
 
       {/* Overlay */}
-      {isOpen && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setIsOpen(false)} />}
+      {isOpen && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm" onClick={() => setIsOpen(false)} />}
 
       {/* Sidebar */}
       <div
         className={cn(
-          "fixed left-0 top-0 h-full w-64 sm:w-72 bg-gradient-to-b from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-950 border-r border-gray-200 dark:border-gray-800 z-40 transform transition-all duration-300 ease-in-out shadow-xl flex flex-col",
+          "fixed left-0 top-0 h-full w-72 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 z-40 transform transition-transform duration-300 ease-in-out flex flex-col shadow-2xl lg:shadow-none",
           isOpen ? "translate-x-0" : "-translate-x-full",
-          "lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:z-0 lg:shadow-none",
+          "lg:translate-x-0 lg:fixed lg:inset-y-0 lg:z-0 lg:shadow-none",
         )}
       >
         {/* Header */}
-        <div className="p-4 sm:p-6 border-b border-gray-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center">
-                <img src="/rayo-logo.png" alt="Rayo Kurir Logo" className="w-full h-full object-contain" />
-              </div>
-              <div>
-                <h1 className="font-bold text-lg sm:text-xl text-gray-900 dark:text-gray-100">Rayo Kurir</h1>
-                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium">{userRole}</p>
-              </div>
+        <div className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-gradient-to-br from-rayo-primary to-rayo-dark shadow-lg shadow-rayo-primary/20">
+              <img src="/rayo-logo.png" alt="Rayo Kurir Logo" className="w-10 h-10 object-contain brightness-0 invert" />
             </div>
-            {userRole === "ADMIN" && <NotificationCenter />}
+            <div>
+              <h1 className="font-bold text-xl tracking-tight text-rayo-dark dark:text-rayo-primary">Rayo Kurir</h1>
+              <p className="text-[10px] font-bold text-white bg-rayo-primary px-2 py-0.5 rounded-full inline-block mt-1 tracking-wide uppercase">{userRole} PANEL</p>
+            </div>
           </div>
         </div>
 
         {/* Navigation */}
-        <div className="flex-1 p-3 sm:p-4 overflow-y-auto">
-          <nav className="space-y-1">
+        <div className="flex-1 px-4 py-2 overflow-y-auto custom-scrollbar">
+          <nav className="space-y-1.5">
             {menuItems.map((item) => {
               const Icon = item.icon
               const isActive = currentPage === item.id
@@ -93,42 +90,43 @@ export function Sidebar({ currentPage, onPageChange, onLogout, userRole }: Sideb
                   key={item.id}
                   variant="ghost"
                   className={cn(
-                    "w-full justify-start gap-2 sm:gap-3 h-10 sm:h-12 px-3 sm:px-4 rounded-xl font-medium transition-all duration-200 text-sm sm:text-base",
+                    "w-full justify-start gap-3.5 h-12 px-4 rounded-xl font-medium transition-all duration-300 relative overflow-hidden group",
                     isActive
-                      ? "bg-rayo-primary text-white shadow-lg hover:bg-rayo-dark"
-                      : "text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100",
+                      ? "bg-rayo-primary text-white shadow-md shadow-rayo-primary/25"
+                      : "text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900 hover:text-gray-900 dark:hover:text-gray-200",
                   )}
                   onClick={() => {
                     onPageChange(item.id)
                     setIsOpen(false)
                   }}
                 >
-                  <Icon className={cn("h-4 w-4 sm:h-5 sm:w-5", isActive ? "text-white" : "text-gray-500 dark:text-gray-400")} />
-                  <span className="truncate">{item.label}</span>
+                  <Icon className={cn("h-5 w-5 transition-colors", isActive ? "text-white" : "text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300")} />
+                  <span className="text-[15px] relative z-10">{item.label}</span>
                 </Button>
               )
             })}
           </nav>
         </div>
 
-        <div className="p-3 sm:p-4 border-t border-gray-100 dark:border-gray-800 space-y-2">
+        {/* Footer Actions */}
+        <div className="p-4 border-t border-gray-100 dark:border-gray-800 space-y-2 bg-gray-50/50 dark:bg-gray-900/50">
           <Button
             variant="ghost"
-            className="w-full justify-start gap-2 sm:gap-3 h-10 sm:h-12 px-3 sm:px-4 rounded-xl font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800 transition-all duration-200 text-sm sm:text-base"
+            className="w-full justify-start gap-3 h-11 px-4 rounded-xl font-medium text-gray-600 hover:text-gray-900 hover:bg-white dark:hover:bg-gray-800 dark:text-gray-400 transition-all shadow-sm border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
             onClick={() => setTheme(theme === "light" ? "dark" : "light")}
           >
-            <Sun className="h-4 w-4 sm:h-5 sm:w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-4 w-4 sm:h-5 sm:w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="truncate">Toggle Theme</span>
+            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="text-sm">Tampilan: {theme === 'light' ? 'Terang' : 'Gelap'}</span>
           </Button>
 
           <Button
             variant="ghost"
-            className="w-full justify-start gap-2 sm:gap-3 h-10 sm:h-12 px-3 sm:px-4 rounded-xl font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/10 transition-all duration-200 text-sm sm:text-base"
+            className="w-full justify-start gap-3 h-11 px-4 rounded-xl font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all"
             onClick={onLogout}
           >
-            <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
-            <span className="truncate">Logout</span>
+            <LogOut className="h-5 w-5" />
+            <span className="text-sm">Keluar Aplikasi</span>
           </Button>
         </div>
       </div>

@@ -32,6 +32,7 @@ export function EditCourierModal({
         nama: "",
         wa: "",
         aktif: true,
+        telegramUserId: "",
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,6 +43,7 @@ export function EditCourierModal({
                 nama: courier.nama,
                 wa: courier.wa,
                 aktif: courier.aktif,
+                telegramUserId: courier.telegramUserId?.toString() || "",
             });
         }
     }, [courier, isOpen]);
@@ -51,6 +53,7 @@ export function EditCourierModal({
             nama: "",
             wa: "",
             aktif: true,
+            telegramUserId: "",
         });
         setErrors({});
     };
@@ -91,6 +94,17 @@ export function EditCourierModal({
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
+        setErrors(newErrors);
+
+        // Add Telegram ID validation
+        if (!formData.telegramUserId.trim()) {
+            newErrors.telegramUserId = "Telegram ID wajib diisi untuk menggunakan bot";
+        } else if (!/^[0-9]+$/.test(formData.telegramUserId.trim())) {
+            newErrors.telegramUserId = "Telegram ID harus berupa angka";
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -106,6 +120,7 @@ export function EditCourierModal({
                 nama: formData.nama.trim(),
                 wa: formData.wa.trim(),
                 aktif: formData.aktif,
+                telegramUserId: formData.telegramUserId.trim() ? Number(formData.telegramUserId.trim()) : undefined,
             });
             onCourierUpdated();
         } catch (error) {
@@ -168,6 +183,26 @@ export function EditCourierModal({
                         {errors.wa && (
                             <p className="text-sm text-red-500">{errors.wa}</p>
                         )}
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="telegramUserId">
+                            Telegram ID <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                            id="telegramUserId"
+                            value={formData.telegramUserId}
+                            onChange={(e) =>
+                                setFormData({ ...formData, telegramUserId: e.target.value })
+                            }
+                            placeholder="123456789"
+                        />
+                        {errors.telegramUserId && (
+                            <p className="text-sm text-red-500">{errors.telegramUserId}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                            Dapatkan ID Telegram Anda dari @userinfobot.
+                        </p>
                     </div>
 
                     <div className="flex items-center justify-between p-3 border rounded-lg">

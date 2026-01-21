@@ -18,7 +18,8 @@ import {
     CreditCard,
     Calendar,
     StickyNote,
-    Truck
+    Truck,
+    Camera
 } from "lucide-react";
 import { formatCurrency, type Order, type Courier } from "@/lib/auth";
 
@@ -212,6 +213,43 @@ export function OrderDetailModal({
                                 <StickyNote className="h-4 w-4" /> Catatan Tambahan
                             </div>
                             <p className="text-yellow-700 dark:text-yellow-300">{order.notes}</p>
+                        </div>
+                    )}
+
+                    {/* POD Photos Section */}
+                    {order.podPhotos && order.podPhotos.length > 0 && (
+                        <div className="space-y-3">
+                            <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                <Camera className="h-4 w-4" /> Bukti Foto (POD)
+                            </h4>
+                            <div className="grid grid-cols-2 gap-2">
+                                {order.podPhotos.map((photo, index) => (
+                                    <div
+                                        key={index}
+                                        className="relative aspect-square rounded-lg border bg-muted/20 flex items-center justify-center overflow-hidden"
+                                    >
+                                        <img
+                                            src={
+                                                photo.url.startsWith('http')
+                                                    ? photo.url
+                                                    : `/api/telegram/image?fileId=${photo.url}`
+                                            }
+                                            alt={`POD ${index + 1}`}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                e.currentTarget.style.display = 'none';
+                                                e.currentTarget.parentElement?.querySelector('.fallback')?.classList.remove('hidden');
+                                            }}
+                                        />
+                                        <div className="fallback hidden w-full h-full flex flex-col items-center justify-center p-4">
+                                            <Camera className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
+                                            <p className="text-xs text-muted-foreground text-center">
+                                                Image Unavailable
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>

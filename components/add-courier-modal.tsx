@@ -28,6 +28,7 @@ export function AddCourierModal({
     const [formData, setFormData] = useState({
         nama: "",
         wa: "",
+        telegramUserId: "",
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,6 +37,7 @@ export function AddCourierModal({
         setFormData({
             nama: "",
             wa: "",
+            telegramUserId: "",
         });
         setErrors({});
     };
@@ -75,6 +77,15 @@ export function AddCourierModal({
         }
 
         setErrors(newErrors);
+
+        // Add Telegram ID validation
+        if (!formData.telegramUserId.trim()) {
+            newErrors.telegramUserId = "Telegram ID wajib diisi untuk menggunakan bot";
+        } else if (!/^[0-9]+$/.test(formData.telegramUserId.trim())) {
+            newErrors.telegramUserId = "Telegram ID harus berupa angka";
+        }
+
+        setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
@@ -92,6 +103,7 @@ export function AddCourierModal({
                 wa: formData.wa.trim(),
                 aktif: true,
                 online: false,
+                telegramUserId: formData.telegramUserId.trim() ? Number(formData.telegramUserId.trim()) : undefined,
             };
 
             await saveCourier(newCourier);
@@ -156,6 +168,26 @@ export function AddCourierModal({
                         {errors.wa && (
                             <p className="text-sm text-red-500">{errors.wa}</p>
                         )}
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="telegramUserId">
+                            Telegram ID <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                            id="telegramUserId"
+                            value={formData.telegramUserId}
+                            onChange={(e) =>
+                                setFormData({ ...formData, telegramUserId: e.target.value })
+                            }
+                            placeholder="123456789"
+                        />
+                        {errors.telegramUserId && (
+                            <p className="text-sm text-red-500">{errors.telegramUserId}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                            Dapatkan ID Telegram Anda dari @userinfobot.
+                        </p>
                     </div>
 
                     <div className="text-sm text-muted-foreground p-3 bg-blue-50 rounded-lg">

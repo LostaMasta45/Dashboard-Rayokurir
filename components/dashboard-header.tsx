@@ -37,7 +37,7 @@ export function DashboardHeader({ currentPage, onPageChange, onLogout, userRole,
     // For Desktop Navigation
     return (
         <header className="sticky top-0 z-40 w-full border-b bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-gray-200 dark:border-gray-800">
-            <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+            <div className="w-full max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
                 {/* Left: Logo */}
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center bg-rayo-primary/10">

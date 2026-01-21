@@ -449,7 +449,7 @@ export function OrdersPage() {
     const statusCounts = getStatusCounts();
 
     return (
-        <div className="space-y-4 sm:space-y-6 p-4 sm:p-6 lg:p-0">
+        <div className="space-y-4 sm:space-y-6 p-4 sm:p-6 lg:p-0 w-full max-w-full">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-bold text-rayo-dark">
@@ -503,7 +503,7 @@ export function OrdersPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 w-full">
                 <Card
                     className="cursor-pointer hover:bg-accent p-3 sm:p-4 transition-colors"
                     onClick={() => setStatusFilter("ALL")}
@@ -730,8 +730,8 @@ export function OrdersPage() {
                             Daftar Orders ({filteredOrders.length})
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-0">
-                        <div className="grid w-full max-w-[calc(100vw-40px)] lg:max-w-full overflow-x-auto rounded-md border border-gray-200 dark:border-gray-800 pb-2">
+                    <CardContent className="p-0 grid grid-cols-1">
+                        <div className="w-full overflow-x-auto rounded-md border border-gray-200 dark:border-gray-800 pb-2">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-gray-50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors">

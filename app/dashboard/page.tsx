@@ -13,6 +13,7 @@ import { KurirDashboard } from "@/components/kurir-dashboard"
 import { AdminMobileNav } from "@/components/admin-mobile-nav"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { MitraPage } from "@/components/mitra-page"
+import { PodGalleryPage } from "@/components/pod-gallery-page"
 import { getCurrentUser, logout, type User } from "@/lib/auth"
 
 export default function Dashboard() {
@@ -76,6 +77,8 @@ export default function Dashboard() {
                 return <DatabasePage />
             case "reports":
                 return <ReportsPage />
+            case "pod":
+                return <PodGalleryPage />
             default:
                 return <AdminDashboard />
         }
@@ -91,7 +94,7 @@ export default function Dashboard() {
                 userRole={user.role}
             />
 
-            <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
+            <div className="flex-1 flex flex-col min-w-0 transition-all duration-300 lg:ml-72">
                 {/* Header - Visible only on mobile/tablet */}
                 <div className="lg:hidden">
                     <DashboardHeader
