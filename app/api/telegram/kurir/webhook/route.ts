@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
     sendTelegramMessage,
+    sendTelegramPhoto,
     answerCallbackQuery,
     editMessageText,
     getKurirBotToken,
@@ -28,6 +29,7 @@ import {
     getIssueTypeKeyboard,
     getOrderListKeyboard,
     getPairingKeyboard,
+    getTalanganListKeyboard,
 } from '@/lib/telegram/keyboards';
 import {
     getKurirWelcomeMessage,
@@ -465,6 +467,26 @@ async function handlePhotoUpload(chatId: number, userId: number, fileId: string)
         return;
     }
 
+    // Get kurir info
+    const { data: kurir } = await supabase
+        .from('couriers')
+        .select('*')
+        .eq('telegram_user_id', userId)
+        .single();
+
+    // Get order info before update
+    const { data: order } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', state.orderId)
+        .single();
+
+    if (!order) {
+        await sendTelegramMessage(botToken, chatId, '❌ Order tidak ditemukan.');
+        userState.delete(userId);
+        return;
+    }
+
     // Save photo to order
     const { error } = await supabase
         .from('orders')
@@ -482,30 +504,59 @@ async function handlePhotoUpload(chatId: number, userId: number, fileId: string)
         return;
     }
 
-    // Notify admin
+    // Notify admin with PHOTO and complete info
     const adminBotToken = getAdminBotToken();
     const adminChatId = getAdminChatId();
 
-    const { data: order } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('id', state.orderId)
-        .single();
+    // Build complete POD notification message
+    const kurirName = kurir?.nama || 'Kurir';
+    const senderName = order.pengirim?.nama || order.customer_name || 'Pengirim';
+    const senderWa = order.pengirim?.wa || order.customer_phone || '-';
+    const pickupAddress = order.pickup?.alamat || order.pickup_address || '-';
+    const dropoffAddress = order.dropoff?.alamat || order.customer_address || '-';
+    const dropoffName = order.dropoff?.nama || senderName;
+    const ongkir = order.ongkir || order.delivery_fee || 0;
+    const codAmount = order.cod?.nominal || 0;
+    const talanganAmount = order.danaTalangan || 0;
 
-    await sendTelegramMessage(
+    let podCaption = `📸 <b>BUKTI FOTO DITERIMA</b>\n`;
+    podCaption += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    podCaption += `📋 Order: <code>#${state.orderId.slice(-6)}</code>\n`;
+    podCaption += `🚚 Kurir: <b>${kurirName}</b>\n\n`;
+    podCaption += `👤 <b>Pengirim</b>\n`;
+    podCaption += `   ${senderName}\n`;
+    podCaption += `   📱 ${senderWa}\n\n`;
+    podCaption += `📍 <b>Pickup</b>\n`;
+    podCaption += `   ${pickupAddress}\n\n`;
+    podCaption += `🏁 <b>Dropoff</b>\n`;
+    podCaption += `   ${dropoffName}\n`;
+    podCaption += `   ${dropoffAddress}\n\n`;
+    podCaption += `💰 <b>Keuangan</b>\n`;
+    podCaption += `   Ongkir: ${formatCurrency(ongkir)}\n`;
+    if (talanganAmount > 0) {
+        podCaption += `   Talangan: ${formatCurrency(talanganAmount)}\n`;
+    }
+    if (codAmount > 0) {
+        podCaption += `   💵 COD: <b>${formatCurrency(codAmount)}</b>\n`;
+    }
+    podCaption += `\n✅ Status: <b>DELIVERED</b>`;
+
+    // Send photo to admin
+    await sendTelegramPhoto(
         adminBotToken,
         adminChatId,
-        `📸 <b>BUKTI FOTO DITERIMA</b>\n\n` +
-        `Order: <code>#${state.orderId.slice(-6)}</code>\n` +
-        `Kurir telah mengupload bukti pengiriman.\n` +
-        `Status: ✅ DELIVERED`
+        fileId,
+        podCaption
     );
 
     await sendTelegramMessage(
         botToken,
         chatId,
-        '✅ <b>BUKTI DITERIMA!</b>\n\nFoto tersimpan. Silakan update status order.',
-        { reply_markup: getBackButton('kurir_tasks') }
+        `✅ <b>BUKTI DITERIMA!</b>\n\n` +
+        `Order <code>#${state.orderId.slice(-6)}</code> telah selesai.\n` +
+        `Foto bukti pengiriman tersimpan.\n\n` +
+        `Terima kasih! 🎉`,
+        { reply_markup: getBackButton('kurir_menu') }
     );
 }
 
@@ -799,6 +850,17 @@ async function handleCallback(chatId: number, messageId: number, userId: number,
             `📱 Hubungi Admin: wa.me/6281234567890`,
             { reply_markup: getPairingKeyboard() }
         );
+    }
+
+    // rk:talangan:list - Show orders with pending talangan
+    else if (data === 'rk:talangan:list') {
+        await handleTalanganList(chatId, messageId, kurir);
+    }
+
+    // rk:talangan:confirm:orderId - Confirm talangan reimbursed
+    else if (data.startsWith('rk:talangan:confirm:')) {
+        const orderId = data.split(':')[3];
+        await handleTalanganConfirm(chatId, messageId, kurir, orderId);
     }
 }
 
@@ -1203,11 +1265,12 @@ async function handleRkAccept(chatId: number, messageId: number, kurir: any, ord
     }
 
     // Update order status to ACCEPTED
-    const now = new Date().toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
     const auditLog = order.auditLog || [];
     auditLog.push({
         event: 'ORDER_ACCEPTED',
-        at: now,
+        at: nowIso,
         actorType: 'COURIER',
         actorId: kurir.id,
         meta: { telegramUserId: kurir.telegram_user_id },
@@ -1223,17 +1286,46 @@ async function handleRkAccept(chatId: number, messageId: number, kurir: any, ord
         return;
     }
 
-    // Notify admin
+    // Build complete admin notification
+    const kurirName = kurir?.nama || kurir?.name || 'Kurir';
+    const senderName = order.pengirim?.nama || order.customer_name || 'Pengirim';
+    const senderWa = order.pengirim?.wa || order.customer_phone || '-';
+    const pickupAddress = order.pickup?.alamat || order.pickup_address || '-';
+    const dropoffAddress = order.dropoff?.alamat || order.customer_address || '-';
+    const ongkir = order.ongkir || order.delivery_fee || 0;
+    const codAmount = order.cod?.nominal || 0;
+    const talanganAmount = order.danaTalangan || 0;
+
+    // Format time for WIB
+    const timeStr = now.toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Jakarta'
+    });
+
+    // Notify admin with complete info
     const adminBotToken = getAdminBotToken();
     const adminChatId = getAdminChatId();
-    await sendTelegramMessage(
-        adminBotToken,
-        adminChatId,
-        `✅ <b>ORDER DITERIMA</b>\n\n` +
-        `Order: <code>#${orderId.slice(-6)}</code>\n` +
-        `Kurir: ${kurir.name}\n` +
-        `Status: ACCEPTED`
-    );
+
+    let adminMessage = `✅ <b>ORDER DITERIMA</b>\n`;
+    adminMessage += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    adminMessage += `📋 Order: <code>#${orderId.slice(-6)}</code>\n`;
+    adminMessage += `🚚 Kurir: <b>${kurirName}</b>\n\n`;
+    adminMessage += `👤 Pengirim: ${senderName}\n`;
+    adminMessage += `📱 WA: ${senderWa}\n\n`;
+    adminMessage += `📍 Pickup: ${pickupAddress}\n`;
+    adminMessage += `🏁 Dropoff: ${dropoffAddress}\n\n`;
+    adminMessage += `💰 Ongkir: ${formatCurrency(ongkir)}\n`;
+    if (talanganAmount > 0) {
+        adminMessage += `🧾 Talangan: ${formatCurrency(talanganAmount)}\n`;
+    }
+    if (codAmount > 0) {
+        adminMessage += `💵 COD: <b>${formatCurrency(codAmount)}</b>\n`;
+    }
+    adminMessage += `\n📊 Status: <b>ACCEPTED</b>\n`;
+    adminMessage += `⏰ Waktu: ${timeStr} WIB`;
+
+    await sendTelegramMessage(adminBotToken, adminChatId, adminMessage);
 
     await editMessageText(
         botToken,
@@ -1376,11 +1468,12 @@ async function handleRkStatusUpdate(chatId: number, messageId: number, kurir: an
     }
 
     // Update order status
-    const now = new Date().toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
     const auditLog = order.auditLog || [];
     auditLog.push({
         event: `STATUS_${newStatus}`,
-        at: now,
+        at: nowIso,
         actorType: 'COURIER',
         actorId: kurir.id,
         meta: { telegramUserId: kurir.telegram_user_id, previousStatus: order.status },
@@ -1405,17 +1498,36 @@ async function handleRkStatusUpdate(chatId: number, messageId: number, kurir: an
         DELIVERED: '🎉 Selesai',
     };
 
-    // Notify admin
+    // Build complete admin notification
+    const kurirName = kurir?.nama || kurir?.name || 'Kurir';
+    const senderName = order.pengirim?.nama || order.customer_name || 'Pengirim';
+    const senderWa = order.pengirim?.wa || order.customer_phone || '-';
+    const pickupAddress = order.pickup?.alamat || order.pickup_address || '-';
+    const dropoffAddress = order.dropoff?.alamat || order.customer_address || '-';
+
+    // Format time for WIB
+    const timeStr = now.toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Jakarta'
+    });
+
+    // Notify admin with complete info
     const adminBotToken = getAdminBotToken();
     const adminChatId = getAdminChatId();
-    await sendTelegramMessage(
-        adminBotToken,
-        adminChatId,
-        `📝 <b>UPDATE STATUS</b>\n\n` +
-        `Order: <code>#${orderId.slice(-6)}</code>\n` +
-        `Kurir: ${kurir.name}\n` +
-        `Status: ${statusLabels[newStatus] || newStatus}`
-    );
+
+    let adminMessage = `${StatusEmoji[newStatus] || '📝'} <b>UPDATE STATUS</b>\n`;
+    adminMessage += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    adminMessage += `📋 Order: <code>#${orderId.slice(-6)}</code>\n`;
+    adminMessage += `🚚 Kurir: <b>${kurirName}</b>\n\n`;
+    adminMessage += `👤 Pengirim: ${senderName}\n`;
+    adminMessage += `📱 WA: ${senderWa}\n\n`;
+    adminMessage += `📍 Pickup: ${pickupAddress}\n`;
+    adminMessage += `🏁 Dropoff: ${dropoffAddress}\n\n`;
+    adminMessage += `📊 Status: <b>${statusLabels[newStatus] || newStatus}</b>\n`;
+    adminMessage += `⏰ Waktu: ${timeStr} WIB`;
+
+    await sendTelegramMessage(adminBotToken, adminChatId, adminMessage);
 
     await editMessageText(
         botToken,
@@ -1556,3 +1668,155 @@ async function handleRkOrderDetail(chatId: number, messageId: number, kurir: any
     );
 }
 
+// ============================================
+// TALANGAN HANDLER FUNCTIONS
+// ============================================
+
+// Handle talangan list - show orders with pending talangan
+async function handleTalanganList(chatId: number, messageId: number, kurir: any) {
+    const botToken = getKurirBotToken();
+
+    // Get orders with pending talangan for this courier
+    const { data: orders, error } = await supabase
+        .from('orders')
+        .select('id, danaTalangan, talanganReimbursed, status')
+        .eq('kurirId', kurir.id)
+        .gt('danaTalangan', 0)
+        .eq('talanganReimbursed', false)
+        .in('status', ['SELESAI', 'DELIVERED'])
+        .order('createdAt', { ascending: false });
+
+    if (error || !orders?.length) {
+        await editMessageText(
+            botToken,
+            chatId,
+            messageId,
+            `🧾 <b>DANA TALANGAN</b>\n\n` +
+            `✅ Tidak ada dana talangan yang belum diganti.\n\n` +
+            `Semua talangan sudah dikonfirmasi! 🎉`,
+            { reply_markup: getBackButton('kurir_wallet') }
+        );
+        return;
+    }
+
+    // Calculate total pending talangan
+    const totalPending = orders.reduce((sum, o) => sum + (o.danaTalangan || 0), 0);
+
+    // Build list for keyboard
+    const orderList = orders.map(o => ({
+        id: o.id,
+        shortId: o.id.slice(-6).toUpperCase(),
+        amount: o.danaTalangan || 0
+    }));
+
+    await editMessageText(
+        botToken,
+        chatId,
+        messageId,
+        `🧾 <b>DANA TALANGAN BELUM DIGANTI</b>\n\n` +
+        `Total: <b>${formatCurrency(totalPending)}</b>\n` +
+        `Jumlah order: ${orders.length}\n\n` +
+        `Klik order untuk konfirmasi talangan sudah diganti:`,
+        { reply_markup: getTalanganListKeyboard(orderList) }
+    );
+}
+
+// Handle talangan confirmation
+async function handleTalanganConfirm(chatId: number, messageId: number, kurir: any, orderId: string) {
+    const botToken = getKurirBotToken();
+
+    // Get order
+    const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+    if (orderError || !order) {
+        await editMessageText(botToken, chatId, messageId, '❌ Order tidak ditemukan.');
+        return;
+    }
+
+    // Validate order belongs to this courier
+    if (order.kurirId !== kurir.id) {
+        await editMessageText(botToken, chatId, messageId, '❌ Order ini tidak ditugaskan ke Anda.');
+        return;
+    }
+
+    // Check if already reimbursed
+    if (order.talanganReimbursed) {
+        await editMessageText(
+            botToken, chatId, messageId,
+            `✅ Talangan untuk order <code>#${orderId.slice(-6)}</code> sudah dikonfirmasi sebelumnya.`,
+            { reply_markup: getBackButton('rk:talangan:list') }
+        );
+        return;
+    }
+
+    // Update order - mark talangan as reimbursed
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const auditLog = order.auditLog || [];
+    auditLog.push({
+        event: 'TALANGAN_REIMBURSED',
+        at: nowIso,
+        actorType: 'COURIER',
+        actorId: kurir.id,
+        meta: {
+            telegramUserId: kurir.telegram_user_id,
+            amount: order.danaTalangan
+        },
+    });
+
+    const { error: updateError } = await supabase
+        .from('orders')
+        .update({
+            talanganReimbursed: true,
+            auditLog
+        })
+        .eq('id', orderId);
+
+    if (updateError) {
+        await editMessageText(botToken, chatId, messageId, '❌ Gagal konfirmasi talangan. Coba lagi.');
+        return;
+    }
+
+    // Notify admin
+    const adminBotToken = getAdminBotToken();
+    const adminChatId = getAdminChatId();
+
+    const kurirName = kurir?.nama || kurir?.name || 'Kurir';
+    const senderName = order.pengirim?.nama || order.customer_name || 'Pengirim';
+    const talanganAmount = order.danaTalangan || 0;
+
+    // Format time for WIB
+    const timeStr = now.toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Jakarta'
+    });
+
+    let adminMessage = `💰 <b>TALANGAN DIGANTI</b>\n`;
+    adminMessage += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    adminMessage += `📋 Order: <code>#${orderId.slice(-6)}</code>\n`;
+    adminMessage += `🚚 Kurir: <b>${kurirName}</b>\n\n`;
+    adminMessage += `👤 Pengirim: ${senderName}\n`;
+    adminMessage += `💵 Nominal: <b>${formatCurrency(talanganAmount)}</b>\n\n`;
+    adminMessage += `✅ Status: <b>SUDAH DIGANTI</b>\n`;
+    adminMessage += `⏰ Waktu: ${timeStr} WIB`;
+
+    await sendTelegramMessage(adminBotToken, adminChatId, adminMessage);
+
+    // Confirm to courier
+    await editMessageText(
+        botToken,
+        chatId,
+        messageId,
+        `✅ <b>TALANGAN DIKONFIRMASI</b>\n\n` +
+        `Order: <code>#${orderId.slice(-6)}</code>\n` +
+        `Nominal: <b>${formatCurrency(talanganAmount)}</b>\n\n` +
+        `Dana talangan sudah dicatat sebagai diganti.\n` +
+        `Data akan otomatis tersinkronisasi ke dashboard admin.`,
+        { reply_markup: getBackButton('rk:talangan:list') }
+    );
+}

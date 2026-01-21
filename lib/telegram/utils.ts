@@ -193,7 +193,7 @@ export const OrderStatus = {
 export type OrderStatusType = typeof OrderStatus[keyof typeof OrderStatus];
 
 // Status emoji mapping
-export const StatusEmoji: Record<OrderStatusType, string> = {
+export const StatusEmoji: Record<string, string> = {
     MENUNGGU: '⏳',
     PICKUP_OTW: '🚚',
     BARANG_DIAMBIL: '📦',
@@ -201,10 +201,22 @@ export const StatusEmoji: Record<OrderStatusType, string> = {
     SELESAI: '✅',
     GAGAL: '❌',
     BATAL: '🚫',
+    // New status types
+    OFFERED: '📩',
+    ACCEPTED: '✅',
+    ASSIGNED: '📋',
+    OTW_PICKUP: '🚚',
+    PICKED: '📦',
+    OTW_DROPOFF: '🏃',
+    NEED_POD: '📸',
+    DELIVERED: '🎉',
+    REJECTED: '❌',
+    CANCELLED: '🚫',
+    PICKUP: '📦',
 };
 
 // Status label mapping
-export const StatusLabel: Record<OrderStatusType, string> = {
+export const StatusLabel: Record<string, string> = {
     MENUNGGU: 'Menunggu Kurir',
     PICKUP_OTW: 'OTW ke Pickup',
     BARANG_DIAMBIL: 'Barang Sudah Diambil',
@@ -212,4 +224,16 @@ export const StatusLabel: Record<OrderStatusType, string> = {
     SELESAI: 'Selesai',
     GAGAL: 'Gagal',
     BATAL: 'Dibatalkan',
+    // New status types
+    OFFERED: 'Ditawarkan',
+    ACCEPTED: 'Diterima',
+    ASSIGNED: 'Ditugaskan',
+    OTW_PICKUP: 'OTW Jemput',
+    PICKED: 'Sudah Jemput',
+    OTW_DROPOFF: 'OTW Antar',
+    NEED_POD: 'Terkirim - Butuh POD',
+    DELIVERED: 'Selesai',
+    REJECTED: 'Ditolak',
+    CANCELLED: 'Dibatalkan',
+    PICKUP: 'Sudah Jemput',
 };

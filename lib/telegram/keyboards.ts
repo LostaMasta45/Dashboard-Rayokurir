@@ -213,10 +213,27 @@ export function getWalletKeyboard(): InlineKeyboardMarkup {
                 { text: '📜 Riwayat Setoran', callback_data: 'wallet_history' },
             ],
             [
+                { text: '🧾 Konfirmasi Talangan Diganti', callback_data: 'rk:talangan:list' },
+            ],
+            [
                 { text: '← Kembali', callback_data: 'kurir_menu' },
             ],
         ],
     };
+}
+
+// Talangan list keyboard
+export function getTalanganListKeyboard(orders: Array<{ id: string; shortId: string; amount: number }>): InlineKeyboardMarkup {
+    const buttons: InlineKeyboardButton[][] = orders.map(order => [
+        {
+            text: `🧾 #${order.shortId} - Rp ${order.amount.toLocaleString('id-ID')}`,
+            callback_data: `rk:talangan:confirm:${order.id}`
+        }
+    ]);
+
+    buttons.push([{ text: '← Kembali ke Dompet', callback_data: 'kurir_wallet' }]);
+
+    return { inline_keyboard: buttons };
 }
 
 // Back button
