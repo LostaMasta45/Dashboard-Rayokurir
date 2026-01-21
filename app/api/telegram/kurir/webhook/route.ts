@@ -487,11 +487,20 @@ async function handlePhotoUpload(chatId: number, userId: number, fileId: string)
         return;
     }
 
-    // Save photo to order
+    // Save photo to order with proper structure
+    const now = new Date().toISOString();
+    const currentPodPhotos = order.podPhotos || [];
+    const newPodPhoto = {
+        url: fileId, // Store Telegram file_id as URL (will be proxied via /api/telegram/image)
+        fileId: fileId,
+        uploadedAt: now,
+        uploadedBy: kurir?.id || 'kurir',
+    };
+
     const { error } = await supabase
         .from('orders')
         .update({
-            podPhotos: [fileId], // Store Telegram file_id for POD
+            podPhotos: [...currentPodPhotos, newPodPhoto], // Append new POD photo with proper structure
             status: 'DELIVERED', // Mark as delivered when POD uploaded
         })
         .eq('id', state.orderId);

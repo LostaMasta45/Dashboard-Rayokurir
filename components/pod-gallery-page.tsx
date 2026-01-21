@@ -52,8 +52,8 @@ interface PODPhoto {
     uploadedBy: string;
 }
 
-interface OrderWithPOD extends Order {
-    podPhotos: PODPhoto[];
+interface OrderWithPOD extends Omit<Order, 'podPhotos'> {
+    podPhotos: (PODPhoto | string)[];
 }
 
 export function PodGalleryPage() {
@@ -234,11 +234,18 @@ export function PodGalleryPage() {
         return colors[status] || "bg-gray-100 text-gray-800";
     };
 
-    const getPhotoUrl = (photo: PODPhoto) => {
+    const getPhotoUrl = (photo: PODPhoto | string) => {
+        // Handle legacy format where podPhotos might be just string (fileId)
+        if (typeof photo === 'string') {
+            if (photo.startsWith("http")) return photo;
+            return `/api/telegram/image?fileId=${photo}`;
+        }
+
+        // Handle object format
         if (!photo.url) return "/placeholder.svg";
         if (photo.url.startsWith("http")) return photo.url;
         // Assume it's a Telegram File ID if not http
-        return `/api/telegram/image?fileId=${photo.url}`;
+        return `/api/telegram/image?fileId=${photo.fileId || photo.url}`;
     };
 
     if (loading) {
