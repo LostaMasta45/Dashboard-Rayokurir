@@ -37,7 +37,24 @@ export default function MitraPageV2() {
     const trendingMitra = dummyMitra.slice(0, 5); // Just taking first 5 for now
 
     return (
-        <div className="min-h-screen bg-[#F3F4F5] dark:bg-black font-sans pb-24 md:max-w-md md:mx-auto md:shadow-2xl md:min-h-screen border-x border-gray-100 dark:border-gray-800">
+        <div className="min-h-screen bg-[#F3F4F5] dark:bg-black font-sans pb-24 md:max-w-md md:mx-auto md:shadow-2xl md:min-h-screen border-x border-gray-100 dark:border-gray-800 relative">
+
+            {/* === COMING SOON OVERLAY === */}
+            <div className="fixed inset-0 z-[100] pointer-events-none flex items-center justify-center max-w-md mx-auto">
+                {/* Background Tint */}
+                <div className="absolute inset-0 bg-white/60 dark:bg-black/60 backdrop-blur-[2px] rounded-[2rem]" />
+
+                {/* Text Container */}
+                <div className="relative bg-white/80 dark:bg-black/80 backdrop-blur-md border border-white/20 shadow-2xl px-6 py-8 rounded-[2rem] transform -rotate-3 hover:rotate-0 transition-transform duration-500 mx-6 text-center">
+                    <div className="absolute -top-3 -right-3 w-8 h-8 bg-teal-500 rounded-full animate-pulse" />
+                    <h2 className="text-4xl font-black tracking-tight text-gray-900 dark:text-white mb-2 leading-none">
+                        COMING <span className="text-teal-500">SOON</span>
+                    </h2>
+                    <p className="text-sm font-bold text-gray-500 uppercase tracking-widest leading-relaxed mt-2">
+                        untuk semua <br /> <span className="text-teal-600 dark:text-teal-400">Mitra Rayo Kurir</span>
+                    </p>
+                </div>
+            </div>
             {/* 1. Super App Header (Sticky) */}
             <div className="sticky top-0 z-50 bg-[#F3F4F5] dark:bg-black">
                 <MitraHomeHeader />

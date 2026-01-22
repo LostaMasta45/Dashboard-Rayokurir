@@ -137,6 +137,12 @@ function SortableItem({
                                     <Phone className="h-3 w-3" /> {item.wa}
                                 </a>
                             )}
+                            {item.catatan && (
+                                <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
+                                    <FileText className="h-3 w-3 mt-0.5 shrink-0" />
+                                    <span>{item.catatan}</span>
+                                </p>
+                            )}
                         </div>
                         <Badge
                             variant="outline"
@@ -215,7 +221,7 @@ function SortableItem({
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 
@@ -518,6 +524,7 @@ export default function RekapanPage() {
             .update({
                 nama: editItem.nama,
                 zona: editItem.zona,
+                catatan: editItem.catatan,
                 updated_at: new Date().toISOString()
             })
             .eq("id", editItem.id);
@@ -529,7 +536,7 @@ export default function RekapanPage() {
             setUmkmList((prev) =>
                 prev.map((item) =>
                     item.id === editItem.id
-                        ? { ...item, nama: editItem.nama, zona: editItem.zona }
+                        ? { ...item, nama: editItem.nama, zona: editItem.zona, catatan: editItem.catatan }
                         : item
                 )
             );
@@ -828,6 +835,15 @@ export default function RekapanPage() {
                                     placeholder="Nama UMKM"
                                     value={editItem.nama}
                                     onChange={(e) => setEditItem({ ...editItem, nama: e.target.value })}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium mb-1 block">Keterangan</label>
+                                <textarea
+                                    placeholder="Tambahkan catatan/keterangan..."
+                                    className="flex max-h-[150px] min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    value={editItem.catatan || ""}
+                                    onChange={(e) => setEditItem({ ...editItem, catatan: e.target.value })}
                                 />
                             </div>
                             <div>

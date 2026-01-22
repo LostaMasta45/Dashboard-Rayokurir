@@ -347,7 +347,24 @@ export default function MitraPage() {
     if (!mounted) return null;
 
     return (
-        <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#09090b] font-sans md:bg-[#FDF8F5] md:dark:bg-gray-950 transition-colors duration-500">
+        <div className="min-h-screen bg-[#FAFAFA] dark:bg-[#09090b] font-sans md:bg-[#FDF8F5] md:dark:bg-gray-950 transition-colors duration-500 relative">
+
+            {/* === COMING SOON OVERLAY === */}
+            <div className="fixed inset-0 z-[100] pointer-events-none flex items-center justify-center">
+                {/* Background Tint */}
+                <div className="absolute inset-0 bg-white/60 dark:bg-black/60 backdrop-blur-[2px]" />
+
+                {/* Text Container */}
+                <div className="relative bg-white/80 dark:bg-black/80 backdrop-blur-md border border-white/20 shadow-2xl px-10 py-6 rounded-[2rem] transform -rotate-3 hover:rotate-0 transition-transform duration-500">
+                    <div className="absolute -top-3 -right-3 w-8 h-8 bg-teal-500 rounded-full animate-bounce" />
+                    <h2 className="text-4xl md:text-6xl font-black tracking-tight text-gray-900 dark:text-white mb-2">
+                        COMING <span className="text-teal-500">SOON</span>
+                    </h2>
+                    <p className="text-center text-sm font-bold text-gray-500 uppercase tracking-widest">
+                        Rayo Food
+                    </p>
+                </div>
+            </div>
 
             {/* === MOBILE HEADER (Hidden on Desktop) === */}
             <div className={`sticky top-0 z-40 bg-[#FAFAFA] dark:bg-[#09090b] md:hidden transition-all duration-300`}>
