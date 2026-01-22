@@ -45,10 +45,12 @@ export function AdminDashboard() {
 
     const stats = {
         totalToday: todayOrders.length,
-        completed: todayOrders.filter((order) => order.status === "SELESAI")
-            .length,
-        pending: todayOrders.filter((order) => order.status !== "SELESAI")
-            .length,
+        completed: todayOrders.filter((order) =>
+            ["SELESAI", "DELIVERED"].includes(order.status)
+        ).length,
+        pending: todayOrders.filter((order) =>
+            !["SELESAI", "DELIVERED", "CANCELLED"].includes(order.status)
+        ).length,
         codOutstanding: orders
             .filter((order) => order.cod.isCOD && !order.cod.codPaid)
             .reduce((sum, order) => sum + order.cod.nominal, 0),
@@ -77,7 +79,9 @@ export function AdminDashboard() {
         return courier?.nama || "-";
     };
 
-    const recentOrders = orders.slice(0, 5);
+    const recentOrders = [...orders]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5);
 
     return (
         <div className="space-y-4 sm:space-y-6 p-4 sm:p-6 lg:p-0">
