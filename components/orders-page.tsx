@@ -169,6 +169,11 @@ export function OrdersPage() {
             );
         }
 
+        // Sort by newest first (createdAt descending)
+        filtered.sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
         setFilteredOrders(filtered);
     };
 

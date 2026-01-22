@@ -48,8 +48,9 @@ const DB_PASSWORD = process.env.SUPABASE_DB_PASSWORD || 'BismillahSukses100%';
 // Extract project ref from URL (e.g., iazhrskfoqipajchjnhi)
 const PROJECT_REF = SUPABASE_URL ? SUPABASE_URL.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] : null;
 
-// PostgreSQL connection string for DDL operations
-const PG_CONNECTION_STRING = `postgresql://postgres.${PROJECT_REF}:${encodeURIComponent(DB_PASSWORD)}@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres`;
+// PostgreSQL connection string - Direct Connection format
+// Format: postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
+const PG_CONNECTION_STRING = `postgresql://postgres:${encodeURIComponent(DB_PASSWORD)}@db.${PROJECT_REF}.supabase.co:5432/postgres`;
 
 if (!SUPABASE_SERVICE_KEY) {
     console.error('❌ Error: SUPABASE_SERVICE_ROLE_KEY tidak ditemukan di .env.local');

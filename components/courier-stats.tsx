@@ -36,13 +36,17 @@ export function CourierStats({ orders, userName }: CourierStatsProps) {
     // Calculate stats for TODAY
     const todayStats = {
         total: todayOrders.length,
-        menunggu: todayOrders.filter((o) => o.status === "BARU").length,
-        otw: todayOrders.filter((o) =>
-            ["ASSIGNED", "PICKUP", "DIKIRIM"].includes(o.status)
+        menunggu: todayOrders.filter((o) =>
+            ["BARU", "NEW", "OFFERED"].includes(o.status)
         ).length,
-        selesai: todayOrders.filter((o) => o.status === "SELESAI").length,
+        otw: todayOrders.filter((o) =>
+            ["ASSIGNED", "PICKUP", "DIKIRIM", "ACCEPTED", "OTW_PICKUP", "PICKED", "OTW_DROPOFF", "NEED_POD"].includes(o.status)
+        ).length,
+        selesai: todayOrders.filter((o) =>
+            ["SELESAI", "DELIVERED"].includes(o.status)
+        ).length,
         totalEarnings: todayOrders
-            .filter((o) => o.status === "SELESAI")
+            .filter((o) => ["SELESAI", "DELIVERED"].includes(o.status))
             .reduce((sum, o) => sum + o.ongkir * 0.1, 0), // Assume 10% commission
     };
 

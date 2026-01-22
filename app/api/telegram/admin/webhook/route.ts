@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
     sendTelegramMessage,
+    sendTelegramPhoto,
     answerCallbackQuery,
     editMessageText,
     getAdminBotToken,
@@ -636,19 +637,55 @@ async function handleOrderDetail(chatId: number, messageId: number, orderId: str
         return;
     }
 
+    // Build order detail message with proper field mapping
+    const senderName = order.pengirim?.nama || order.customer_name || 'Pengirim';
+    const senderWa = order.pengirim?.wa || order.customer_phone || '-';
+    const pickupAddress = order.pickup?.alamat || order.pickup_address || '-';
+    const dropoffAddress = order.dropoff?.alamat || order.customer_address || '-';
+    const ongkir = order.ongkir || order.delivery_fee || 0;
+    const codAmount = order.cod?.nominal || 0;
+    const paymentMethod = order.ongkirPaymentMethod || '-';
+
+    let detailMessage = `📦 <b>DETAIL ORDER</b>\n\n`;
+    detailMessage += `🆔 #${orderId.slice(-6)}\n`;
+    detailMessage += `👤 ${senderName}\n`;
+    detailMessage += `📱 ${senderWa}\n\n`;
+    detailMessage += `📍 Pickup: ${pickupAddress}\n`;
+    detailMessage += `🏁 Dropoff: ${dropoffAddress}\n\n`;
+    detailMessage += `💰 Ongkir: ${formatCurrency(ongkir)}\n`;
+    if (codAmount > 0) {
+        detailMessage += `💵 COD: ${formatCurrency(codAmount)}\n`;
+    }
+    if (order.ongkirPaymentMethod) {
+        detailMessage += `💳 Bayar: ${paymentMethod}\n`;
+    }
+    detailMessage += `\n📊 Status: <b>${order.status}</b>`;
+
+    // Send order detail message
     await editMessageText(
         botToken,
         chatId,
         messageId,
-        `📦 <b>DETAIL ORDER</b>\n\n` +
-        `🆔 ${order.order_number}\n` +
-        `👤 ${order.customer_name}\n` +
-        `📍 ${order.customer_address}\n` +
-        `📱 ${order.customer_phone}\n\n` +
-        `💰 Total: ${formatCurrency(order.total)}\n` +
-        `📊 Status: ${order.status}`,
+        detailMessage,
         { reply_markup: getOrderActions(orderId) }
     );
+
+    // Send POD photos if available
+    const podPhotos = order.podPhotos || [];
+    if (podPhotos.length > 0) {
+        for (let i = 0; i < podPhotos.length; i++) {
+            const photo = podPhotos[i];
+            const uploadTime = photo.uploadedAt
+                ? new Date(photo.uploadedAt).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
+                : 'N/A';
+            await sendTelegramPhoto(
+                botToken,
+                chatId,
+                photo.fileId || photo.url,
+                `📸 POD ${i + 1}/${podPhotos.length}\nOrder: #${orderId.slice(-6)}\nWaktu: ${uploadTime}`
+            );
+        }
+    }
 }
 
 // Handle reject order

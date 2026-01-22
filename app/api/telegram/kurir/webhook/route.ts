@@ -1630,17 +1630,19 @@ async function handleRkStatusUpdate(chatId: number, messageId: number, kurir: an
         return;
     }
 
-    // Allowed transitions
+    // Allowed transitions - more flexible
     const allowedTransitions: Record<string, string[]> = {
+        // New status flow
+        OFFERED: ['ACCEPTED', 'REJECTED'],
         ACCEPTED: ['OTW_PICKUP'],
         OTW_PICKUP: ['PICKED'],
         PICKED: ['OTW_DROPOFF'],
-        OTW_DROPOFF: ['NEED_POD'],
+        OTW_DROPOFF: ['NEED_POD', 'DELIVERED'], // Allow direct complete if POD already uploaded
         NEED_POD: ['DELIVERED'],
-        // Legacy
-        ASSIGNED: ['OTW_PICKUP', 'PICKUP'],
-        PICKUP: ['OTW_DROPOFF', 'DIKIRIM'],
-        DIKIRIM: ['NEED_POD', 'SELESAI'],
+        // Legacy status flow
+        ASSIGNED: ['OTW_PICKUP', 'PICKUP', 'ACCEPTED'],
+        PICKUP: ['OTW_DROPOFF', 'DIKIRIM', 'PICKED'],
+        DIKIRIM: ['NEED_POD', 'SELESAI', 'DELIVERED'],
     };
 
     const allowed = allowedTransitions[order.status] || [];
