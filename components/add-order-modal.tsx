@@ -86,6 +86,7 @@ export function AddOrderModal({
         danaTalangan: "",
         codNominal: "",
         bayarOngkir: "NON_COD",
+        ongkirPaymentMethod: "CASH",
         // Section E: Operasional
         notes: "",
         kurirId: "",
@@ -166,6 +167,7 @@ export function AddOrderModal({
             danaTalangan: "",
             codNominal: "",
             bayarOngkir: "NON_COD",
+            ongkirPaymentMethod: "CASH",
             notes: "",
             kurirId: "",
         });
@@ -319,6 +321,11 @@ export function AddOrderModal({
                 codSettled: false,
                 nonCodPaid:
                     codNominal === 0 && formData.bayarOngkir === "NON_COD",
+                // Payment method tracking
+                ongkirPaymentMethod: formData.bayarOngkir === "COD"
+                    ? formData.ongkirPaymentMethod as "CASH" | "QRIS" | "TRANSFER"
+                    : undefined,
+                ongkirPaymentStatus: formData.bayarOngkir === "NON_COD" ? "PAID" : "PENDING",
                 notes: formData.notes.trim(),
                 podPhotos: [],
                 auditLog: [{
@@ -465,6 +472,11 @@ export function AddOrderModal({
                 codSettled: false,
                 nonCodPaid:
                     codNominal === 0 && formData.bayarOngkir === "NON_COD",
+                // Payment method tracking
+                ongkirPaymentMethod: formData.bayarOngkir === "COD"
+                    ? formData.ongkirPaymentMethod as "CASH" | "QRIS" | "TRANSFER"
+                    : undefined,
+                ongkirPaymentStatus: formData.bayarOngkir === "NON_COD" ? "PAID" : "PENDING",
                 notes: formData.notes.trim(),
                 podPhotos: [],
                 auditLog: [{
@@ -521,6 +533,7 @@ export function AddOrderModal({
                 danaTalangan: "",
                 codNominal: "",
                 bayarOngkir: "NON_COD",
+                ongkirPaymentMethod: "CASH",
                 notes: "",
                 kurirId: formData.kurirId,
             });
@@ -988,6 +1001,34 @@ export function AddOrderModal({
                                 </SelectContent>
                             </Select>
                         </FormField>
+
+                        {/* Payment Method - Only shown for COD */}
+                        {formData.bayarOngkir === "COD" && (
+                            <FormField label="Metode Pembayaran Penerima">
+                                <Select
+                                    value={formData.ongkirPaymentMethod}
+                                    onValueChange={(value) =>
+                                        handleInputChange("ongkirPaymentMethod", value)
+                                    }
+                                    disabled={isSubmitting}
+                                >
+                                    <SelectTrigger className="h-10 sm:h-11">
+                                        <SelectValue placeholder="Pilih metode pembayaran" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="CASH">
+                                            💵 Cash (Tunai)
+                                        </SelectItem>
+                                        <SelectItem value="QRIS">
+                                            📱 QRIS
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Cara penerima bayar ke kurir
+                                </p>
+                            </FormField>
+                        )}
 
                         {/* Warning alerts */}
                         {warnings.length > 0 && (

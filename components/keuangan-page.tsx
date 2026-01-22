@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { CODDepositModal } from "@/components/cod-deposit-modal";
 import { AddExpenseModal } from "@/components/add-expense-modal";
+import { PaymentMethodSummary } from "@/components/dashboard/payment-method-summary";
 import {
     Tooltip,
     TooltipContent,
@@ -508,11 +509,10 @@ export function KeuanganPage() {
                     </CardHeader>
                     <CardContent className="p-0 pt-2">
                         <div
-                            className={`text-lg sm:text-xl xl:text-2xl font-bold ${
-                                financialSummary.profit >= 0
-                                    ? "text-green-600"
-                                    : "text-red-600"
-                            }`}
+                            className={`text-lg sm:text-xl xl:text-2xl font-bold ${financialSummary.profit >= 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                                }`}
                         >
                             {formatCurrency(financialSummary.profit)}
                         </div>
@@ -522,6 +522,9 @@ export function KeuanganPage() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Payment Method Summary */}
+            <PaymentMethodSummary orders={orders} couriers={couriers} />
 
             <Card>
                 <CardHeader>
@@ -620,7 +623,7 @@ export function KeuanganPage() {
                                                             <div
                                                                 className={
                                                                     outstandingCOD >
-                                                                    0
+                                                                        0
                                                                         ? "text-red-600 font-medium"
                                                                         : "text-green-600"
                                                                 }
@@ -643,7 +646,7 @@ export function KeuanganPage() {
                                                             <div
                                                                 className={
                                                                     outstandingTalangan >
-                                                                    0
+                                                                        0
                                                                         ? "text-orange-600 font-medium"
                                                                         : "text-green-600"
                                                                 }
@@ -659,34 +662,34 @@ export function KeuanganPage() {
                                                         <div className="flex flex-col sm:flex-row gap-2">
                                                             {outstandingCOD >
                                                                 0 && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    onClick={() =>
-                                                                        handleCODDeposit(
-                                                                            courier
-                                                                        )
-                                                                    }
-                                                                    className="bg-rayo-primary hover:bg-rayo-dark text-xs h-8 px-3"
-                                                                >
-                                                                    Setor COD
-                                                                </Button>
-                                                            )}
+                                                                    <Button
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            handleCODDeposit(
+                                                                                courier
+                                                                            )
+                                                                        }
+                                                                        className="bg-rayo-primary hover:bg-rayo-dark text-xs h-8 px-3"
+                                                                    >
+                                                                        Setor COD
+                                                                    </Button>
+                                                                )}
                                                             {outstandingTalangan >
                                                                 0 && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    onClick={() =>
-                                                                        handleMarkTalanganReimbursed(
-                                                                            courier.id
-                                                                        )
-                                                                    }
-                                                                    className="text-xs bg-orange-50 hover:bg-orange-100 h-8 px-3"
-                                                                >
-                                                                    Talangan
-                                                                    Diganti
-                                                                </Button>
-                                                            )}
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={() =>
+                                                                            handleMarkTalanganReimbursed(
+                                                                                courier.id
+                                                                            )
+                                                                        }
+                                                                        className="text-xs bg-orange-50 hover:bg-orange-100 h-8 px-3"
+                                                                    >
+                                                                        Talangan
+                                                                        Diganti
+                                                                    </Button>
+                                                                )}
                                                         </div>
                                                     </td>
                                                 </tr>

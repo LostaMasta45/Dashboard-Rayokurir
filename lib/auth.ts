@@ -90,6 +90,10 @@ export interface Order {
     };
     codSettled?: boolean;
     nonCodPaid: boolean;
+    // Payment method tracking
+    ongkirPaymentMethod?: "CASH" | "QRIS" | "TRANSFER";
+    ongkirPaymentStatus?: "PENDING" | "PAID";
+    ongkirPaidAt?: string;
     notes?: string;
     podPhotos?: Array<{
         url: string;

@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Package, CheckCircle, Clock, DollarSign } from "lucide-react";
 import { AddOrderModal } from "@/components/add-order-modal";
+import { OrderTrendChart } from "@/components/dashboard/order-trend-chart";
+import { TopMitraCard } from "@/components/dashboard/top-mitra-card";
+import { FinancialSummaryCard } from "@/components/dashboard/financial-summary-card";
+import { LatestPODsCard } from "@/components/dashboard/latest-pods-card";
 
 import {
     getOrders,
@@ -20,29 +24,9 @@ export function AdminDashboard() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [couriers, setCouriers] = useState<Courier[]>([]);
     const [showAddModal, setShowAddModal] = useState(false);
-    const [uploadedPhotos, setUploadedPhotos] = useState<
-        Array<{
-            id: string;
-            kurirId: string;
-            kurirName: string;
-            photoUrl: string;
-            description: string;
-            timestamp: string;
-            orderId?: string;
-        }>
-    >([]);
 
     useEffect(() => {
-        (async () => {
-            await loadData();
-            // Load uploaded photos metadata from Supabase DB
-            const { data: photos, error } = await supabase
-                .from("courier_photos")
-                .select("*");
-            if (!error && photos) {
-                setUploadedPhotos(photos);
-            }
-        })();
+        loadData();
     }, []);
 
     const loadData = async () => {
@@ -186,51 +170,17 @@ export function AdminDashboard() {
                 </Card>
             </div>
 
-            {uploadedPhotos.length > 0 && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-lg sm:text-xl">
-                            Foto Testimoni Kurir
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                            {uploadedPhotos.slice(0, 8).map((photo) => (
-                                <div
-                                    key={photo.id}
-                                    className="border rounded-lg p-3 space-y-2 hover:shadow-md transition-shadow"
-                                >
-                                    <img
-                                        src={
-                                            photo.photoUrl || "/placeholder.svg"
-                                        }
-                                        alt="Testimoni kurir"
-                                        className="w-full h-32 sm:h-40 object-cover rounded-md"
-                                    />
-                                    <div className="space-y-1">
-                                        <p className="font-medium text-sm">
-                                            {photo.kurirName}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground line-clamp-2">
-                                            {photo.description}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {new Date(
-                                                photo.timestamp
-                                            ).toLocaleString("id-ID")}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        {uploadedPhotos.length > 8 && (
-                            <p className="text-sm text-muted-foreground mt-4 text-center">
-                                Dan {uploadedPhotos.length - 8} foto lainnya...
-                            </p>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
+            {/* Financial Summary */}
+            <FinancialSummaryCard orders={orders} />
+
+            {/* Growth Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
+                <OrderTrendChart orders={orders} />
+                <TopMitraCard orders={orders} />
+            </div>
+
+            {/* Latest PODs */}
+            <LatestPODsCard orders={orders} />
 
             {/* Recent Orders Table */}
             <Card>
@@ -321,9 +271,9 @@ export function AdminDashboard() {
                                                         </div>
                                                         <div
                                                             className={`text-xs ${order.cod
-                                                                    .codPaid
-                                                                    ? "text-green-600"
-                                                                    : "text-red-600"
+                                                                .codPaid
+                                                                ? "text-green-600"
+                                                                : "text-red-600"
                                                                 }`}
                                                         >
                                                             {order.cod.codPaid

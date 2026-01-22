@@ -65,6 +65,7 @@ export function OrdersPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [bayarOngkirFilter, setBayarOngkirFilter] = useState("ALL");
     const [talanganStatusFilter, setTalanganStatusFilter] = useState("ALL");
+    const [paymentMethodFilter, setPaymentMethodFilter] = useState("ALL");
 
     useEffect(() => {
         // Default to cards view on mobile to avoid horizontal scrolling
@@ -88,6 +89,7 @@ export function OrdersPage() {
         searchQuery,
         bayarOngkirFilter,
         talanganStatusFilter,
+        paymentMethodFilter,
     ]);
 
     const loadData = async () => {
@@ -146,6 +148,13 @@ export function OrdersPage() {
                 }
                 return !order.talanganReimbursed;
             });
+        }
+
+        // Payment Method filter
+        if (paymentMethodFilter !== "ALL") {
+            filtered = filtered.filter(
+                (order) => order.ongkirPaymentMethod === paymentMethodFilter
+            );
         }
 
         // Search filter
@@ -376,11 +385,19 @@ export function OrdersPage() {
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <div className="inline-flex items-center gap-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded text-[10px] sm:text-xs border border-blue-100 dark:border-blue-800 whitespace-nowrap">
-                                ðŸ’¸ Ongkir {formatCurrency(order.ongkir)}
+                                💸 Ongkir {formatCurrency(order.ongkir)}
+                                {order.bayarOngkir === "COD" && order.ongkirPaymentMethod && (
+                                    <span className={`ml-1 px-1 rounded text-[9px] font-medium ${order.ongkirPaymentMethod === "QRIS"
+                                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                                        : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
+                                        }`}>
+                                        {order.ongkirPaymentMethod === "QRIS" ? "📱" : "💵"} {order.ongkirPaymentMethod}
+                                    </span>
+                                )}
                             </div>
                         </TooltipTrigger>
                         <TooltipContent>
-                            <p>Biaya jasa antar - masuk ke pendapatan</p>
+                            <p>Biaya jasa antar{order.ongkirPaymentMethod ? ` - Bayar via ${order.ongkirPaymentMethod}` : ""}</p>
                         </TooltipContent>
                     </Tooltip>
 
@@ -612,7 +629,8 @@ export function OrdersPage() {
                                         jenisOrderFilter,
                                         serviceTypeFilter,
                                         bayarOngkirFilter,
-                                        talanganStatusFilter
+                                        talanganStatusFilter,
+                                        paymentMethodFilter
                                     ].filter(f => f !== "ALL").length}
                                 </Badge>
                                 {isFiltersOpen ? <ChevronUp className="h-4 w-4 ml-auto sm:ml-2" /> : <ChevronDown className="h-4 w-4 ml-auto sm:ml-2" />}
@@ -688,6 +706,16 @@ export function OrdersPage() {
                                         <SelectItem value="ALL">Semua Status Talangan</SelectItem>
                                         <SelectItem value="REIMBURSED">Sudah Diganti</SelectItem>
                                         <SelectItem value="OUTSTANDING">Belum Diganti</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Select value={paymentMethodFilter || "ALL"} onValueChange={setPaymentMethodFilter}>
+                                    <SelectTrigger className="h-10 sm:h-11">
+                                        <SelectValue placeholder="Metode Bayar" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ALL">Semua Metode</SelectItem>
+                                        <SelectItem value="CASH">💵 Cash</SelectItem>
+                                        <SelectItem value="QRIS">📱 QRIS</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

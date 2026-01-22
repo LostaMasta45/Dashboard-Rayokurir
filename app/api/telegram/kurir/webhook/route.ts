@@ -69,8 +69,8 @@ interface TelegramUpdate {
     };
 }
 
-// User state for tracking context (e.g., waiting for photo upload)
-const userState: Map<number, { action: string; orderId?: string }> = new Map();
+// User state for tracking context (e.g., waiting for photo upload, payment method)
+const userState: Map<number, { action?: string; orderId?: string; step?: string }> = new Map();
 
 // POST handler for webhook
 export async function POST(request: NextRequest) {
@@ -115,6 +115,8 @@ export async function POST(request: NextRequest) {
                 await sendTelegramMessage(botToken, chatId, getKurirHelpMessage());
             } else if (text === '/daftar' || text === '/register') {
                 await handleRegister(chatId, userId, firstName);
+            } else if (text === '/setor' || text === '/ringkasan') {
+                await handleDailySummary(chatId, userId);
             }
         }
 
@@ -224,6 +226,103 @@ async function handleMenu(chatId: number, telegramId: number) {
         chatId,
         getKurirWelcomeMessage(kurirData, stats.todayOrders, stats.todayEarnings, stats.pendingCOD),
         { reply_markup: getKurirMainMenu(kurir.online) }
+    );
+}
+
+// Handle /setor or /ringkasan command - Daily summary
+async function handleDailySummary(chatId: number, telegramId: number) {
+    const botToken = getKurirBotToken();
+
+    const { data: kurir } = await supabase
+        .from('couriers')
+        .select('*')
+        .eq('telegram_user_id', telegramId)
+        .single();
+
+    if (!kurir) {
+        await sendTelegramMessage(
+            botToken,
+            chatId,
+            '⛔ Anda belum terdaftar. Ketik /start untuk info pendaftaran.'
+        );
+        return;
+    }
+
+    const today = new Date().toDateString();
+
+    // Get courier's orders
+    const { data: orders } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('kurirId', kurir.id);
+
+    const courierOrders = orders || [];
+
+    // Today's completed orders
+    const todayOrders = courierOrders.filter(
+        (o: { createdDate: string; status: string }) =>
+            o.createdDate === today &&
+            (o.status === 'DELIVERED' || o.status === 'SELESAI')
+    );
+
+    // Payment method breakdown
+    const cashOrders = todayOrders.filter((o: { ongkirPaymentMethod?: string }) => o.ongkirPaymentMethod === 'CASH');
+    const qrisOrders = todayOrders.filter((o: { ongkirPaymentMethod?: string }) => o.ongkirPaymentMethod === 'QRIS');
+
+    const cashTotal = cashOrders.reduce((sum: number, o: { ongkir?: number }) => sum + (o.ongkir || 0), 0);
+    const qrisTotal = qrisOrders.reduce((sum: number, o: { ongkir?: number }) => sum + (o.ongkir || 0), 0);
+    const totalOngkir = cashTotal + qrisTotal;
+
+    // Outstanding cash (COD orders with CASH payment, not yet settled)
+    const outstandingCash = courierOrders
+        .filter((o: { bayarOngkir?: string; ongkirPaymentMethod?: string; codSettled?: boolean; status: string }) =>
+            o.bayarOngkir === 'COD' &&
+            o.ongkirPaymentMethod === 'CASH' &&
+            !o.codSettled &&
+            (o.status === 'DELIVERED' || o.status === 'SELESAI')
+        )
+        .reduce((sum: number, o: { ongkir?: number }) => sum + (o.ongkir || 0), 0);
+
+    // COD to deposit
+    const pendingCOD = courierOrders
+        .filter((o: { cod?: { isCOD: boolean; codPaid: boolean }; status: string }) =>
+            o.cod?.isCOD &&
+            !o.cod?.codPaid &&
+            (o.status === 'DELIVERED' || o.status === 'SELESAI')
+        )
+        .reduce((sum: number, o: { cod?: { nominal: number } }) => sum + (o.cod?.nominal || 0), 0);
+
+    let message = `📊 <b>RINGKASAN HARI INI</b>\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    message += `📅 ${new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}\n\n`;
+
+    message += `📦 <b>Total Order:</b> ${todayOrders.length} order\n\n`;
+
+    message += `💰 <b>Ongkir Hari Ini:</b>\n`;
+    message += `   💵 Cash: ${formatCurrency(cashTotal)} (${cashOrders.length} order)\n`;
+    message += `   📱 QRIS: ${formatCurrency(qrisTotal)} (${qrisOrders.length} order)\n`;
+    message += `   ━━━━━━━━━━━━━━━━\n`;
+    message += `   📈 Total: <b>${formatCurrency(totalOngkir)}</b>\n\n`;
+
+    if (outstandingCash > 0 || pendingCOD > 0) {
+        message += `⚠️ <b>Perlu Disetor:</b>\n`;
+        if (outstandingCash > 0) {
+            message += `   💵 Cash Ongkir: ${formatCurrency(outstandingCash)}\n`;
+        }
+        if (pendingCOD > 0) {
+            message += `   🏷️ COD: ${formatCurrency(pendingCOD)}\n`;
+        }
+        message += `   ━━━━━━━━━━━━━━━━\n`;
+        message += `   💰 Total Setor: <b>${formatCurrency(outstandingCash + pendingCOD)}</b>\n`;
+    } else {
+        message += `✅ Tidak ada yang perlu disetor!`;
+    }
+
+    await sendTelegramMessage(
+        botToken,
+        chatId,
+        message,
+        { reply_markup: getBackButton('kurir_menu') }
     );
 }
 
@@ -558,15 +657,51 @@ async function handlePhotoUpload(chatId: number, userId: number, fileId: string)
         podCaption
     );
 
-    await sendTelegramMessage(
-        botToken,
-        chatId,
-        `✅ <b>BUKTI DITERIMA!</b>\n\n` +
-        `Order <code>#${state.orderId.slice(-6)}</code> telah selesai.\n` +
-        `Foto bukti pengiriman tersimpan.\n\n` +
-        `Terima kasih! 🎉`,
-        { reply_markup: getBackButton('kurir_menu') }
-    );
+    // For COD orders, ask payment method. For non-COD, mark as paid immediately.
+    const isCOD = order.bayarOngkir === 'COD';
+
+    if (isCOD) {
+        // Store order ID for payment method selection callback
+        userState.set(userId, { orderId: state.orderId, step: 'awaiting_payment_method' });
+
+        await sendTelegramMessage(
+            botToken,
+            chatId,
+            `✅ <b>BUKTI DITERIMA!</b>\n\n` +
+            `Order <code>#${state.orderId.slice(-6)}</code> sudah diantar.\n\n` +
+            `💰 <b>Bagaimana customer bayar ongkir?</b>`,
+            {
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            { text: '💵 Cash (Tunai)', callback_data: `payment_method_CASH_${state.orderId}` },
+                            { text: '📱 QRIS', callback_data: `payment_method_QRIS_${state.orderId}` }
+                        ],
+                        [{ text: '⬅️ Kembali ke Menu', callback_data: 'kurir_menu' }]
+                    ]
+                }
+            }
+        );
+    } else {
+        // Non-COD: mark payment as completed immediately
+        await supabase
+            .from('orders')
+            .update({
+                ongkirPaymentStatus: 'PAID',
+                ongkirPaidAt: new Date().toISOString()
+            })
+            .eq('id', state.orderId);
+
+        await sendTelegramMessage(
+            botToken,
+            chatId,
+            `✅ <b>BUKTI DITERIMA!</b>\n\n` +
+            `Order <code>#${state.orderId.slice(-6)}</code> telah selesai.\n` +
+            `Foto bukti pengiriman tersimpan.\n\n` +
+            `Terima kasih! 🎉`,
+            { reply_markup: getBackButton('kurir_menu') }
+        );
+    }
 }
 
 // ============================================
@@ -645,6 +780,47 @@ async function handleCallback(chatId: number, messageId: number, userId: number,
     // Stats
     else if (data === 'kurir_stats') {
         await handleStatsCallback(chatId, messageId, kurir);
+    }
+
+    // Payment method selection (after POD upload for COD orders)
+    else if (data.startsWith('payment_method_')) {
+        const parts = data.split('_');
+        const method = parts[2] as 'CASH' | 'QRIS'; // payment_method_CASH_xxx or payment_method_QRIS_xxx
+        const orderId = parts.slice(3).join('_');
+
+        // Update order with payment method
+        const { error } = await supabase
+            .from('orders')
+            .update({
+                ongkirPaymentMethod: method,
+                ongkirPaymentStatus: 'PAID',
+                ongkirPaidAt: new Date().toISOString()
+            })
+            .eq('id', orderId);
+
+        userState.delete(userId);
+
+        if (error) {
+            await editMessageText(
+                botToken,
+                chatId,
+                messageId,
+                '❌ Gagal menyimpan metode pembayaran. Coba lagi.',
+                { reply_markup: getBackButton('kurir_menu') }
+            );
+        } else {
+            const emoji = method === 'QRIS' ? '📱' : '💵';
+            await editMessageText(
+                botToken,
+                chatId,
+                messageId,
+                `✅ <b>ORDER SELESAI!</b>\n\n` +
+                `Order <code>#${orderId.slice(-6)}</code> telah selesai.\n` +
+                `${emoji} Pembayaran: <b>${method}</b>\n\n` +
+                `Terima kasih! 🎉`,
+                { reply_markup: getBackButton('kurir_menu') }
+            );
+        }
     }
 
     // Accept task
