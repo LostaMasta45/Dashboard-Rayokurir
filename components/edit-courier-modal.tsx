@@ -31,6 +31,7 @@ export function EditCourierModal({
     const [formData, setFormData] = useState({
         nama: "",
         wa: "",
+        email: "",
         aktif: true,
         telegramUserId: "",
     });
@@ -42,6 +43,7 @@ export function EditCourierModal({
             setFormData({
                 nama: courier.nama,
                 wa: courier.wa,
+                email: courier.email || "",
                 aktif: courier.aktif,
                 telegramUserId: courier.telegramUserId?.toString() || "",
             });
@@ -52,6 +54,7 @@ export function EditCourierModal({
         setFormData({
             nama: "",
             wa: "",
+            email: "",
             aktif: true,
             telegramUserId: "",
         });
@@ -73,6 +76,10 @@ export function EditCourierModal({
             newErrors.wa = "Format nomor WhatsApp tidak valid";
         }
 
+        if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+            newErrors.email = "Format email tidak valid";
+        }
+
         // Check if courier with same name or WA already exists (excluding current courier)
         const existingCouriers = await getCouriers();
         if (
@@ -90,6 +97,18 @@ export function EditCourierModal({
             )
         ) {
             newErrors.wa = "Nomor WhatsApp ini sudah terdaftar";
+        }
+
+        if (
+            formData.email.trim() &&
+            existingCouriers.some(
+                (c) =>
+                    c.id !== courier?.id &&
+                    c.email?.toLowerCase() ===
+                    formData.email.trim().toLowerCase()
+            )
+        ) {
+            newErrors.email = "Email ini sudah terdaftar";
         }
 
         setErrors(newErrors);
@@ -119,6 +138,7 @@ export function EditCourierModal({
                 ...courier,
                 nama: formData.nama.trim(),
                 wa: formData.wa.trim(),
+                email: formData.email.trim() || undefined,
                 aktif: formData.aktif,
                 telegramUserId: formData.telegramUserId.trim() ? Number(formData.telegramUserId.trim()) : undefined,
             });
@@ -182,6 +202,25 @@ export function EditCourierModal({
                         />
                         {errors.wa && (
                             <p className="text-sm text-red-500">{errors.wa}</p>
+                        )}
+                        {errors.wa && (
+                            <p className="text-sm text-red-500">{errors.wa}</p>
+                        )}
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="email">Email Login (Opsional)</Label>
+                        <Input
+                            id="email"
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) =>
+                                setFormData({ ...formData, email: e.target.value })
+                            }
+                            placeholder="nama@email.com"
+                        />
+                        {errors.email && (
+                            <p className="text-sm text-red-500">{errors.email}</p>
                         )}
                     </div>
 

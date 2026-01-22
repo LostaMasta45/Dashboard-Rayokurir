@@ -14,7 +14,7 @@ import { AdminMobileNav } from "@/components/admin-mobile-nav"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { MitraPage } from "@/components/mitra-page"
 import { PodGalleryPage } from "@/components/pod-gallery-page"
-import { getCurrentUser, logout, type User } from "@/lib/auth"
+import { getCurrentSession, logoutUser, type User } from "@/lib/auth"
 
 export default function Dashboard() {
     const [user, setUser] = useState<User | null>(null)
@@ -23,17 +23,20 @@ export default function Dashboard() {
     const router = useRouter()
 
     useEffect(() => {
-        const currentUser = getCurrentUser()
-        if (!currentUser) {
-            router.push("/login")
-            return
+        const checkSession = async () => {
+            const currentUser = await getCurrentSession()
+            if (!currentUser) {
+                router.push("/login")
+                return
+            }
+            setUser(currentUser)
+            setLoading(false)
         }
-        setUser(currentUser)
-        setLoading(false)
+        checkSession()
     }, [router])
 
-    const handleLogout = () => {
-        logout()
+    const handleLogout = async () => {
+        await logoutUser()
         setUser(null)
         router.push("/login")
     }

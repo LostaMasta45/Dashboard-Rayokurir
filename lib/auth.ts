@@ -114,6 +114,7 @@ export interface Courier {
     id: string;
     nama: string;
     wa: string;
+    email?: string;
     aktif: boolean;
     online: boolean;
     // Telegram integration fields
@@ -254,6 +255,65 @@ export async function seedSupabaseData() {
 }
 
 // Authentication functions (Supabase)
+// === NEW AUTHENTICATION (Supabase Auth) ===
+
+export async function loginWithEmail(email: string, password: string): Promise<User | null> {
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+    });
+
+    if (error || !data.user) {
+        console.error("Login failed:", error?.message);
+        return null;
+    }
+
+    // Fetch user profile
+    const { data: profile } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", email) // Use email correlation
+        .single();
+
+    if (profile) {
+        if (typeof window !== "undefined") {
+            sessionStorage.setItem("rk_current_user", JSON.stringify(profile));
+        }
+        return profile as User;
+    }
+
+    return null;
+}
+
+export async function logoutUser() {
+    await supabase.auth.signOut();
+    if (typeof window !== "undefined") {
+        sessionStorage.removeItem("rk_current_user");
+    }
+}
+
+export async function getCurrentSession(): Promise<User | null> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return null;
+
+    // Try cache first
+    if (typeof window !== "undefined") {
+        const cached = sessionStorage.getItem("rk_current_user");
+        if (cached) return JSON.parse(cached);
+    }
+
+    // Fetch from DB if not in cache
+    const { data: profile } = await supabase
+        .from("users")
+        .select("*")
+        .eq("auth_id", session.user.id)
+        .single();
+
+    return profile as User | null;
+}
+
+
+// === LEGACY AUTH (To be deprecated) ===
 export async function login(username: string): Promise<User | null> {
     // Query ke tabel users di Supabase
     const { data, error } = await supabase
@@ -372,6 +432,7 @@ export async function getCouriers(): Promise<Courier[]> {
         id: c.id as string,
         nama: c.nama as string,
         wa: c.wa as string,
+        email: c.email as string | undefined,
         aktif: c.aktif as boolean,
         online: c.online as boolean,
         telegramUserId: c.telegram_user_id as number | undefined,
@@ -388,6 +449,7 @@ export async function saveCourier(courier: Courier): Promise<Courier | null> {
         id: courier.id,
         nama: courier.nama,
         wa: courier.wa,
+        email: courier.email,
         aktif: courier.aktif,
         online: courier.online,
         telegram_user_id: courier.telegramUserId,
@@ -413,6 +475,7 @@ export async function updateCourier(courier: Courier): Promise<Courier | null> {
     const dbCourier = {
         nama: courier.nama,
         wa: courier.wa,
+        email: courier.email,
         aktif: courier.aktif,
         online: courier.online,
         telegram_user_id: courier.telegramUserId,

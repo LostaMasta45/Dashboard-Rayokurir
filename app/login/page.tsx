@@ -5,40 +5,42 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { login } from "@/lib/auth"
+import { loginWithEmail } from "@/lib/auth"
 import { toast } from "sonner"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
-import { User, Lock, Truck, ArrowLeft, ShieldCheck, ChevronRight } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
+import { User, Lock, Mail, ArrowLeft, ShieldCheck, ChevronRight } from "lucide-react"
+import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 export default function LoginPage() {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
-    const [username, setUsername] = useState("")
+    const [email, setEmail] = useState("")
+    const [password, setPassword] = useState("")
+
+    // Default to admin for first impression, but works for both
     const [role, setRole] = useState<"admin" | "kurir">("admin")
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!username.trim()) {
-            toast.error("Username wajib diisi")
+        if (!email.trim() || !password.trim()) {
+            toast.error("Email dan Password wajib diisi")
             return
         }
 
         setIsLoading(true)
 
         try {
-            // Simulate loading for better UX
-            await new Promise((resolve) => setTimeout(resolve, 800))
-
-            const user = await login(username.trim())
+            const user = await loginWithEmail(email.trim(), password)
             if (user) {
                 toast.success(`Selamat datang, ${user.name}!`)
                 router.push("/dashboard")
+                router.refresh() // Ensure middleware state updates
             } else {
-                toast.error("Username tidak ditemukan")
+                toast.error("Email atau Password salah")
             }
         } catch (error) {
+            console.error("Login error:", error)
             toast.error("Terjadi kesalahan sistem")
         } finally {
             setIsLoading(false)
@@ -98,7 +100,7 @@ export default function LoginPage() {
                 </div>
 
                 <div className="relative z-10 text-xs text-slate-500">
-                    &copy; 2025 Rayo Kurir. Created with ❤️ for Sumobito.
+                    &copy; 2026 Rayo Kurir. Created with ❤️ for Sumobito.
                 </div>
             </div>
 
@@ -119,78 +121,55 @@ export default function LoginPage() {
                     className="w-full max-w-sm mx-auto space-y-8"
                 >
                     <div className="text-center lg:text-left">
-                        <h2 className="text-3xl font-bold text-slate-900">Welcome Back! 👋</h2>
-                        <p className="text-slate-500 mt-2">Masuk untuk mengakses dashboard.</p>
-                    </div>
-
-                    {/* Custom Tab Switcher */}
-                    <div className="bg-slate-100 p-1 rounded-full grid grid-cols-2 relative">
-                        <div
-                            className={cn(
-                                "absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-full shadow-sm transition-all duration-300 ease-in-out",
-                                role === 'admin' ? "left-1" : "left-[calc(50%+2px)]"
-                            )}
-                        ></div>
-                        <button
-                            onClick={() => { setRole('admin'); setUsername('') }}
-                            className={cn(
-                                "relative z-10 py-2.5 text-sm font-bold text-center transition-colors rounded-full flex items-center justify-center gap-2",
-                                role === 'admin' ? "text-slate-900" : "text-slate-500 hover:text-slate-700"
-                            )}
-                        >
-                            <ShieldCheck size={16} />
-                            Admin
-                        </button>
-                        <button
-                            onClick={() => { setRole('kurir'); setUsername('') }}
-                            className={cn(
-                                "relative z-10 py-2.5 text-sm font-bold text-center transition-colors rounded-full flex items-center justify-center gap-2",
-                                role === 'kurir' ? "text-slate-900" : "text-slate-500 hover:text-slate-700"
-                            )}
-                        >
-                            <Truck size={16} />
-                            Kurir
-                        </button>
+                        <h2 className="text-3xl font-bold text-slate-900">Selamat Datang 👋</h2>
+                        <p className="text-slate-500 mt-2">Masukan email dan password untuk akses.</p>
                     </div>
 
                     <form onSubmit={handleLogin} className="space-y-6">
                         <div className="space-y-2">
-                            <Label htmlFor="username" className="text-slate-900 font-bold text-base">
-                                {role === 'admin' ? 'Username Admin' : 'Username Kurir'}
+                            <Label htmlFor="email" className="text-slate-900 font-bold text-base">
+                                Email
                             </Label>
                             <div className="relative group">
                                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-teal-700 transition-colors">
-                                    {role === 'admin' ? <User size={20} /> : <Truck size={20} />}
+                                    <Mail size={20} />
                                 </div>
-                                <style jsx global>{`
-                                    input:-webkit-autofill,
-                                    input:-webkit-autofill:hover, 
-                                    input:-webkit-autofill:focus, 
-                                    input:-webkit-autofill:active {
-                                        -webkit-box-shadow: 0 0 0 30px white inset !important;
-                                        -webkit-text-fill-color: black !important;
-                                    }
-                                `}</style>
                                 <Input
-                                    id="username"
-                                    placeholder={role === 'admin' ? "admin" : "kurir1"}
-                                    className="pl-12 h-14 bg-white border-2 border-slate-300 focus:border-teal-600 focus:ring-4 focus:ring-teal-500/10 rounded-xl transition-all font-bold text-lg text-black placeholder:text-slate-500"
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
+                                    id="email"
+                                    type="email"
+                                    placeholder="nama@rayokurir.id"
+                                    className="pl-12 h-14 bg-white border-2 border-slate-300 focus:border-teal-600 focus:ring-4 focus:ring-teal-500/10 rounded-xl transition-all font-bold text-lg text-black placeholder:text-slate-400"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
                                     disabled={isLoading}
                                     autoFocus
                                 />
                             </div>
                         </div>
 
+                        <div className="space-y-2">
+                            <Label htmlFor="password" className="text-slate-900 font-bold text-base">
+                                Password
+                            </Label>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-teal-700 transition-colors">
+                                    <Lock size={20} />
+                                </div>
+                                <Input
+                                    id="password"
+                                    type="password"
+                                    placeholder="••••••••"
+                                    className="pl-12 h-14 bg-white border-2 border-slate-300 focus:border-teal-600 focus:ring-4 focus:ring-teal-500/10 rounded-xl transition-all font-bold text-lg text-black placeholder:text-slate-400"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    disabled={isLoading}
+                                />
+                            </div>
+                        </div>
+
                         <Button
                             type="submit"
-                            className={cn(
-                                "w-full h-14 text-lg rounded-xl font-bold shadow-xl transition-all transform active:scale-95",
-                                role === 'admin'
-                                    ? "bg-teal-700 hover:bg-teal-800 text-white shadow-teal-700/20"
-                                    : "bg-blue-700 hover:bg-blue-800 text-white shadow-blue-700/20"
-                            )}
+                            className="w-full h-14 text-lg rounded-xl font-bold shadow-xl transition-all transform active:scale-95 bg-teal-700 hover:bg-teal-800 text-white shadow-teal-700/20"
                             disabled={isLoading}
                         >
                             {isLoading ? <LoadingSpinner className="text-white" /> : (
@@ -203,7 +182,7 @@ export default function LoginPage() {
 
                     <div className="text-center">
                         <p className="text-xs text-slate-400">
-                            Lupa password? <a href="#" className="underline hover:text-teal-600">Hubungi Developer</a>
+                            Lupa password? <a href="https://wa.me/6281234567890" target="_blank" className="underline hover:text-teal-600">Hubungi Admin Pusat</a>
                         </p>
                     </div>
                 </motion.div>
