@@ -1,181 +1,257 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import React, { useState } from "react";
+import { RegistrationData, INITIAL_DATA, RegistrationStep } from "./types";
 import { StepIdentity } from "./step-identity";
 import { StepContact } from "./step-contact";
 import { StepVisual } from "./step-visual";
-import { StepReview } from "./step-review";
-import { ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, ArrowRight, Check, Store } from "lucide-react";
 import { toast } from "sonner";
-import { saveMitra, generateId, type Mitra } from "@/lib/auth";
+import { saveMitra, generateId, MITRA_CATEGORIES } from "@/lib/auth";
+import { useRouter } from "next/navigation";
+import { MitraCardList, MitraCardWidget, MitraCardGlass, MitraCardStory } from "@/components/mitra2/MitraCards";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+// Simple progress indicator
+const ProgressBar = ({ currentStep }: { currentStep: RegistrationStep }) => {
+  const steps: RegistrationStep[] = ['identity', 'contact', 'visual'];
+  const currentIndex = steps.indexOf(currentStep); // -1 for success
+
+  if (currentStep === 'success') return null;
+
+  return (
+    <div className="flex gap-2 mb-6 px-1">
+      {steps.map((s, idx) => (
+        <div
+          key={s}
+          className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${idx <= currentIndex ? 'bg-teal-500' : 'bg-gray-200 dark:bg-gray-800'
+            }`}
+        />
+      ))}
+    </div>
+  );
+};
 
 export function MitraWizard() {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState<RegistrationStep>('identity');
+  const [data, setData] = useState<RegistrationData>(INITIAL_DATA);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const router = useRouter();
 
-  // Form Data State
-  const [formData, setFormData] = useState<Partial<Mitra>>({
-    nama: "",
-    deskripsi: "",
-    kategori: [],
-    type: "food",
-    whatsapp: "",
-    lokasi: "",
-    logo: "",
-    cover: "",
-    waktuAntar: "15-25 menit", // Default
-  });
+  const updateData = (updates: Partial<RegistrationData>) => {
+    setData(prev => ({ ...prev, ...updates }));
+  };
 
-  const totalSteps = 4;
-  const progress = (step / totalSteps) * 100;
-
-  const handleNext = () => {
-    // Validation per step
-    if (step === 1) {
-      if (!formData.nama) return toast.error("Nama usaha wajib diisi");
-      if (!formData.type) return toast.error("Pilih tipe usaha");
-      if (!formData.kategori || formData.kategori.length === 0)
-        return toast.error("Pilih minimal satu kategori");
+  const handleNext = async () => {
+    if (step === 'identity') {
+      if (!data.nama) return toast.error("Nama usaha wajib diisi");
+      if (data.kategori.length === 0) return toast.error("Pilih minimal 1 kategori");
+      setStep('contact');
+    } else if (step === 'contact') {
+      if (!data.ownerName) return toast.error("Nama pemilik wajib diisi");
+      if (!data.whatsapp) return toast.error("Nomor WhatsApp wajib diisi");
+      if (!data.lokasi) return toast.error("Lokasi wajib diisi");
+      setStep('visual');
+    } else if (step === 'visual') {
+      await handleSubmit();
     }
-    if (step === 2) {
-      if (!formData.whatsapp) return toast.error("Nomor WhatsApp wajib diisi");
-      if (!formData.lokasi) return toast.error("Lokasi wajib diisi");
-    }
-
-    setStep((prev) => Math.min(prev + 1, totalSteps));
   };
 
   const handleBack = () => {
-    setStep((prev) => Math.max(prev - 1, 1));
-  };
-
-  const updateFormData = (data: Partial<Mitra>) => {
-    setFormData((prev) => ({ ...prev, ...data }));
+    if (step === 'contact') setStep('identity');
+    if (step === 'visual') setStep('contact');
   };
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
+      let cleanWa = data.whatsapp.replace(/\D/g, '');
+      if (!cleanWa.startsWith('62')) {
+        if (cleanWa.startsWith('0')) cleanWa = '62' + cleanWa.substring(1);
+        else cleanWa = '62' + cleanWa;
+      }
+
       const now = new Date().toISOString();
-      const newMitra: Mitra = {
+
+      const payload = {
         id: generateId(),
-        nama: formData.nama || "",
-        deskripsi: formData.deskripsi,
-        kategori: formData.kategori || [],
-        type: formData.type as any,
-        whatsapp: formData.whatsapp,
-        lokasi: formData.lokasi,
-        logo: formData.logo,
-        cover: formData.cover,
-        waktuAntar: formData.waktuAntar,
+        nama: data.nama,
+        deskripsi: `Mitra ${data.type} oleh ${data.ownerName}`,
+        kategori: data.kategori,
+        type: data.type,
+        logo: data.logo,
+        cover: data.cover,
+        lokasi: data.lokasi,
+        waktuAntar: "15-30 menit", // Default
+        whatsapp: cleanWa,
         rating: 0,
         jumlahReview: 0,
-        sedangBuka: false, // Default pending
+        sedangBuka: false,
         createdAt: now,
         updatedAt: now,
       };
 
-      const result = await saveMitra(newMitra);
+      const result = await saveMitra(payload as any);
+
       if (result) {
-        setIsSuccess(true);
-        // Redirect to WA is handled in success view
+        setStep('success');
       } else {
         toast.error("Gagal mendaftar. Silakan coba lagi.");
       }
-    } catch (error) {
-      console.error("Registration error:", error);
+    } catch (err) {
+      console.error(err);
       toast.error("Terjadi kesalahan sistem.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isSuccess) {
+  const handleOpenWA = () => {
+    const adminWA = "62895413151817";
+    const text = `Halo Admin Rayo, saya baru mendaftar mitra: *${data.nama}*. Mohon di-approve ya!`;
+    window.open(`https://wa.me/${adminWA}?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  // Preview Data Reconstruction
+  const previewData = {
+    id: 0,
+    nama: data.nama || "Nama Usaha Anda",
+    lokasi: data.lokasi || "Lokasi Anda",
+    category: data.kategori.length > 0
+      ? MITRA_CATEGORIES.find(c => c.id === data.kategori[0])?.label || "Kategori"
+      : "Kategori",
+    type: data.type,
+    rating: 0,
+    waktu: "15-30 mnt",
+    harga: 15000,
+    cover: data.cover || "https://images.unsplash.com/photo-1555126634-323283e090fa?w=500&q=80",
+    isBuka: false
+  };
+
+  if (step === 'success') {
     return (
-      <div className="max-w-md mx-auto py-12 px-4 text-center">
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <CheckCircle2 className="h-10 w-10 text-green-600" />
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6 space-y-6 animate-in fade-in zoom-in duration-500">
+        <div className="w-24 h-24 bg-teal-100 rounded-full flex items-center justify-center mb-4">
+          <Check className="w-12 h-12 text-teal-600" />
         </div>
-        <h2 className="text-2xl font-bold mb-2">Pendaftaran Berhasil!</h2>
-        <p className="text-gray-600 mb-8">
-          Data usaha Anda telah tersimpan. Silakan konfirmasi ke admin via WhatsApp untuk aktivasi.
-        </p>
-        <Button
-          className="w-full h-12 text-lg bg-green-600 hover:bg-green-700"
-          onClick={() => {
-            const message = `Halo Admin, saya baru saja daftar mitra.\n\nNama Usaha: ${formData.nama}\nTipe: ${formData.type}\nLokasi: ${formData.lokasi}\n\nMohon segera di-approve ya!`;
-            const url = `https://wa.me/6281234567890?text=${encodeURIComponent(message)}`;
-            window.open(url, "_blank");
-          }}
-        >
-          Lanjut ke WhatsApp
-        </Button>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Pendaftaran Berhasil!</h2>
+          <p className="text-gray-500 mt-2 max-w-xs mx-auto">
+            Data toko Anda sudah tersimpan. Hubungi admin untuk aktivasi toko.
+          </p>
+        </div>
+
+        <div className="w-full max-w-xs space-y-3">
+          <Button onClick={handleOpenWA} className="w-full h-12 text-lg bg-green-500 hover:bg-green-600">
+            <span className="mr-2">💬</span> Hubungi Admin
+          </Button>
+          <Button variant="outline" onClick={() => router.push('/mitra2')} className="w-full h-12">
+            Kembali ke Beranda
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-lg mx-auto pb-20">
-      {/* Progress Header */}
-      <div className="mb-6 sticky top-0 bg-white/80 backdrop-blur-md z-10 py-4 -mx-4 px-4 sm:mx-0 sm:px-0">
-        <div className="flex justify-between text-sm font-medium text-gray-500 mb-2">
-          <span>Langkah {step} dari {totalSteps}</span>
-          <span>{Math.round(progress)}%</span>
+    <div className="w-full max-w-lg md:max-w-5xl mx-auto bg-white dark:bg-black md:dark:bg-transparent min-h-screen md:min-h-[500px] flex flex-col md:flex-row md:items-start md:gap-8 justify-center">
+
+      {/* LEFT COLUMN: FORM */}
+      <div className="flex-1 md:bg-white md:dark:bg-gray-900 md:rounded-3xl md:shadow-xl md:border md:border-gray-200 md:dark:border-gray-800 flex flex-col h-full md:h-auto">
+        {/* Header */}
+        <div className="p-4 md:p-8 flex items-center border-b border-gray-100 dark:border-gray-800">
+          <div className="w-10 h-10 bg-teal-50 dark:bg-teal-900/20 rounded-xl flex items-center justify-center mr-3">
+            <Store className="w-5 h-5 text-teal-600" />
+          </div>
+          <div>
+            <h1 className="font-bold text-gray-900 dark:text-white leading-tight md:text-xl">Daftar Mitra Mandiri</h1>
+            <p className="text-xs text-gray-400">Gabung Rayo Kurir sekarang</p>
+          </div>
         </div>
-        <Progress value={progress} className="h-2" />
+
+        <div className="p-4 md:p-8 flex-1 overflow-y-auto">
+          <ProgressBar currentStep={step} />
+
+          <div className="min-h-[300px] animate-in slide-in-from-right-4 fade-in duration-300">
+            {step === 'identity' && <StepIdentity data={data} updateData={updateData} />}
+            {step === 'contact' && <StepContact data={data} updateData={updateData} />}
+            {step === 'visual' && <StepVisual data={data} updateData={updateData} />}
+          </div>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="p-4 md:p-8 border-t border-gray-100 dark:border-gray-800 bg-white/80 dark:bg-black/80 md:bg-transparent backdrop-blur-sm sticky bottom-0 md:static md:rounded-b-3xl">
+          <div className="flex gap-3">
+            {step !== 'identity' && (
+              <Button variant="outline" onClick={handleBack} className="h-12 w-14 shrink-0 rounded-xl" disabled={isSubmitting}>
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            )}
+            <Button
+              onClick={handleNext}
+              className="h-12 flex-1 rounded-xl bg-teal-600 hover:bg-teal-700 text-base font-bold shadow-lg shadow-teal-600/20"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Menyimpan..." : (step === 'visual' ? "Daftarkan Toko" : "Lanjut")}
+              {!isSubmitting && step !== 'visual' && <ArrowRight className="w-5 h-5 ml-2" />}
+            </Button>
+          </div>
+        </div>
       </div>
 
-      {/* Step Content */}
-      <Card className="p-6 border-0 shadow-sm sm:border sm:shadow-md min-h-[400px]">
-        {step === 1 && (
-          <StepIdentity formData={formData} updateFormData={updateFormData} />
-        )}
-        {step === 2 && (
-          <StepContact formData={formData} updateFormData={updateFormData} />
-        )}
-        {step === 3 && (
-          <StepVisual formData={formData} updateFormData={updateFormData} />
-        )}
-        {step === 4 && (
-          <StepReview formData={formData} />
-        )}
-      </Card>
+      {/* RIGHT COLUMN: PREVIEW (Desktop Only) */}
+      <div className="hidden md:block w-96 shrink-0 sticky top-24 space-y-6">
+        <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-xl border border-gray-200 dark:border-gray-800">
+          <h3 className="font-bold text-gray-900 dark:text-white mb-2 text-center">Live Preview</h3>
+          <p className="text-xs text-gray-500 text-center mb-6">
+            Tampilan toko Anda di berbagai posisi aplikasi
+          </p>
 
-      {/* Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t sm:static sm:bg-transparent sm:border-0 sm:p-0 sm:mt-6 flex gap-3 z-20">
-        {step > 1 && (
-          <Button
-            variant="outline"
-            onClick={handleBack}
-            className="flex-1 h-12 sm:flex-none sm:w-32"
-          >
-            <ChevronLeft className="mr-2 h-4 w-4" />
-            Kembali
-          </Button>
-        )}
-        
-        {step < totalSteps ? (
-          <Button
-            onClick={handleNext}
-            className="flex-1 h-12 bg-teal-600 hover:bg-teal-700 text-white"
-          >
-            Lanjut
-            <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
-        ) : (
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className="flex-1 h-12 bg-teal-600 hover:bg-teal-700 text-white"
-          >
-            {isSubmitting ? "Menyimpan..." : "Daftarkan Usaha"}
-          </Button>
-        )}
+          <Tabs defaultValue="list" className="w-full">
+            <TabsList className="grid w-full grid-cols-4 mb-4 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
+              <TabsTrigger value="list" className="text-[10px] h-7 rounded-lg">List</TabsTrigger>
+              <TabsTrigger value="widget" className="text-[10px] h-7 rounded-lg">Widget</TabsTrigger>
+              <TabsTrigger value="glass" className="text-[10px] h-7 rounded-lg">Glass</TabsTrigger>
+              <TabsTrigger value="story" className="text-[10px] h-7 rounded-lg">Story</TabsTrigger>
+            </TabsList>
+
+            <div className="bg-gray-50 dark:bg-black/20 rounded-2xl p-4 border border-dashed border-gray-200 dark:border-gray-800 min-h-[350px] flex items-center justify-center relative overflow-hidden">
+              <TabsContent value="list" className="w-full mt-0 animate-in zoom-in-50 duration-300">
+                <div className="pointer-events-none select-none flex justify-center">
+                  <MitraCardList data={previewData as any} />
+                </div>
+                <p className="text-[10px] text-gray-400 text-center mt-3">Tampilan di hasil pencarian & list kategori</p>
+              </TabsContent>
+              <TabsContent value="widget" className="w-full mt-0 animate-in zoom-in-50 duration-300 flex flex-col items-center">
+                <div className="pointer-events-none select-none px-2">
+                  <MitraCardWidget data={previewData as any} />
+                </div>
+                <p className="text-[10px] text-gray-400 text-center mt-3">Tampilan di rekomendasi "Favorit"</p>
+              </TabsContent>
+              <TabsContent value="glass" className="w-full mt-0 animate-in zoom-in-50 duration-300 flex flex-col items-center">
+                <div className="pointer-events-none select-none">
+                  <MitraCardGlass data={previewData as any} />
+                </div>
+                <p className="text-[10px] text-gray-400 text-center mt-3">Tampilan di "Lagi Rame"</p>
+              </TabsContent>
+              <TabsContent value="story" className="w-full mt-0 animate-in zoom-in-50 duration-300 flex flex-col items-center">
+                <div className="pointer-events-none select-none">
+                  <MitraCardStory data={previewData as any} />
+                </div>
+                <p className="text-[10px] text-gray-400 text-center mt-3">Tampilan di Story Brand</p>
+              </TabsContent>
+            </div>
+          </Tabs>
+
+          <div className="mt-6 p-4 bg-teal-50 dark:bg-teal-900/20 rounded-xl text-center">
+            <p className="text-xs text-teal-700 dark:text-teal-300 font-medium">
+              ✨ Upload logo & cover menarik agar toko Anda semakin dilirik pelanggan!
+            </p>
+          </div>
+        </div>
       </div>
+
     </div>
   );
 }
