@@ -1,4 +1,12 @@
-export type RegistrationStep = 'identity' | 'contact' | 'visual' | 'success';
+export type RegistrationStep = 'identity' | 'contact' | 'menu' | 'visual' | 'success';
+
+export interface MenuItemDraft {
+    id: string; // temp id
+    nama: string;
+    harga: number;
+    gambar?: string;
+    deskripsi?: string;
+}
 
 export interface RegistrationData {
     // Identity
@@ -10,6 +18,9 @@ export interface RegistrationData {
     ownerName: string;
     whatsapp: string;
     lokasi: string;
+
+    // Menu
+    menuItems: MenuItemDraft[];
 
     // Visual
     logo?: string;
@@ -23,6 +34,7 @@ export const INITIAL_DATA: RegistrationData = {
     ownerName: "",
     whatsapp: "",
     lokasi: "",
+    menuItems: [],
     logo: "",
     cover: ""
 };

@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function PendaftaranMitraPage() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black font-sans flex items-center justify-center p-0 md:p-6">
+    <div className="min-h-screen bg-white dark:bg-black font-sans">
       <MitraWizard />
     </div>
   );

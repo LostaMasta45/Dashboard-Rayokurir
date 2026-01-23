@@ -4,18 +4,20 @@ import React, { useState } from "react";
 import { RegistrationData, INITIAL_DATA, RegistrationStep } from "./types";
 import { StepIdentity } from "./step-identity";
 import { StepContact } from "./step-contact";
+import { StepMenu } from "./step-menu";
 import { StepVisual } from "./step-visual";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, Check, Store } from "lucide-react";
 import { toast } from "sonner";
-import { saveMitra, generateId, MITRA_CATEGORIES } from "@/lib/auth";
+import { saveMitra, saveMenuItem, generateId, MITRA_CATEGORIES } from "@/lib/auth";
 import { useRouter } from "next/navigation";
 import { MitraCardList, MitraCardWidget, MitraCardGlass, MitraCardStory } from "@/components/mitra2/MitraCards";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ModeToggle } from "@/components/mode-toggle";
 
 // Simple progress indicator
 const ProgressBar = ({ currentStep }: { currentStep: RegistrationStep }) => {
-  const steps: RegistrationStep[] = ['identity', 'contact', 'visual'];
+  const steps: RegistrationStep[] = ['identity', 'contact', 'menu', 'visual'];
   const currentIndex = steps.indexOf(currentStep); // -1 for success
 
   if (currentStep === 'success') return null;
@@ -52,6 +54,10 @@ export function MitraWizard() {
       if (!data.ownerName) return toast.error("Nama pemilik wajib diisi");
       if (!data.whatsapp) return toast.error("Nomor WhatsApp wajib diisi");
       if (!data.lokasi) return toast.error("Lokasi wajib diisi");
+      setStep('menu');
+    } else if (step === 'menu') {
+      // Validation for menu is optional, but maybe nice to have at least 1 item?
+      // if (data.menuItems.length === 0) return toast.error("Tambahkan minimal 1 menu");
       setStep('visual');
     } else if (step === 'visual') {
       await handleSubmit();
@@ -60,7 +66,8 @@ export function MitraWizard() {
 
   const handleBack = () => {
     if (step === 'contact') setStep('identity');
-    if (step === 'visual') setStep('contact');
+    if (step === 'menu') setStep('contact');
+    if (step === 'visual') setStep('menu');
   };
 
   const handleSubmit = async () => {
@@ -94,7 +101,27 @@ export function MitraWizard() {
 
       const result = await saveMitra(payload as any);
 
+
+
       if (result) {
+        // Save Menu Items
+        if (data.menuItems.length > 0) {
+          for (const item of data.menuItems) {
+            await saveMenuItem({
+              id: generateId(),
+              mitraId: result.id,
+              nama: item.nama,
+              harga: item.harga,
+              gambar: item.gambar,
+              deskripsi: item.deskripsi,
+              kategoriMenu: "Utama", // Default category
+              terlaris: false,
+              tersedia: true,
+              createdAt: now,
+              updatedAt: now
+            });
+          }
+        }
         setStep('success');
       } else {
         toast.error("Gagal mendaftar. Silakan coba lagi.");
@@ -131,22 +158,22 @@ export function MitraWizard() {
 
   if (step === 'success') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6 space-y-6 animate-in fade-in zoom-in duration-500">
+      <div className="min-h-screen flex flex-col items-center justify-center text-center p-6 space-y-8 animate-in fade-in zoom-in duration-500 bg-white dark:bg-black">
         <div className="w-24 h-24 bg-teal-100 rounded-full flex items-center justify-center mb-4">
           <Check className="w-12 h-12 text-teal-600" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Pendaftaran Berhasil!</h2>
-          <p className="text-gray-500 mt-2 max-w-xs mx-auto">
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Pendaftaran Berhasil!</h2>
+          <p className="text-gray-500 mt-3 max-w-sm mx-auto text-lg">
             Data toko Anda sudah tersimpan. Hubungi admin untuk aktivasi toko.
           </p>
         </div>
 
-        <div className="w-full max-w-xs space-y-3">
-          <Button onClick={handleOpenWA} className="w-full h-12 text-lg bg-green-500 hover:bg-green-600">
+        <div className="w-full max-w-sm space-y-4">
+          <Button onClick={handleOpenWA} className="w-full h-14 text-lg bg-green-500 hover:bg-green-600 rounded-xl font-bold uppercase tracking-wide shadow-lg shadow-green-500/20">
             <span className="mr-2">💬</span> Hubungi Admin
           </Button>
-          <Button variant="outline" onClick={() => router.push('/mitra2')} className="w-full h-12">
+          <Button variant="outline" onClick={() => router.push('/mitra2')} className="w-full h-14 text-lg rounded-xl">
             Kembali ke Beranda
           </Button>
         </div>
@@ -155,99 +182,113 @@ export function MitraWizard() {
   }
 
   return (
-    <div className="w-full max-w-lg md:max-w-5xl mx-auto bg-white dark:bg-black md:dark:bg-transparent min-h-screen md:min-h-[500px] flex flex-col md:flex-row md:items-start md:gap-8 justify-center">
+    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-white dark:bg-black">
 
       {/* LEFT COLUMN: FORM */}
-      <div className="flex-1 md:bg-white md:dark:bg-gray-900 md:rounded-3xl md:shadow-xl md:border md:border-gray-200 md:dark:border-gray-800 flex flex-col h-full md:h-auto">
-        {/* Header */}
-        <div className="p-4 md:p-8 flex items-center border-b border-gray-100 dark:border-gray-800">
-          <div className="w-10 h-10 bg-teal-50 dark:bg-teal-900/20 rounded-xl flex items-center justify-center mr-3">
-            <Store className="w-5 h-5 text-teal-600" />
+      <div className="flex-1 flex flex-col h-auto min-h-screen relative z-10">
+        <div className="w-full max-w-2xl mx-auto flex flex-col h-full p-6 lg:p-12">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-8 lg:mb-12">
+            <div className="flex items-center">
+              <div className="w-12 h-12 bg-teal-50 dark:bg-teal-900/20 rounded-2xl flex items-center justify-center mr-4">
+                <Store className="w-6 h-6 text-teal-600" />
+              </div>
+              <div>
+                <h1 className="font-bold text-gray-900 dark:text-white text-2xl lg:text-3xl">Daftar Mitra</h1>
+                <p className="text-sm text-gray-500 font-medium">Gabung Rayo Kurir & Mulai Jualan</p>
+              </div>
+            </div>
+            <ModeToggle />
           </div>
-          <div>
-            <h1 className="font-bold text-gray-900 dark:text-white leading-tight md:text-xl">Daftar Mitra Mandiri</h1>
-            <p className="text-xs text-gray-400">Gabung Rayo Kurir sekarang</p>
+
+          <div className="flex-1 mb-12">
+            <ProgressBar currentStep={step} />
+
+            <div className="animate-in slide-in-from-right-4 fade-in duration-300 py-4">
+              {step === 'identity' && <StepIdentity data={data} updateData={updateData} />}
+              {step === 'contact' && <StepContact data={data} updateData={updateData} />}
+              {step === 'menu' && <StepMenu data={data} updateData={updateData} />}
+              {step === 'visual' && <StepVisual data={data} updateData={updateData} />}
+            </div>
           </div>
-        </div>
 
-        <div className="p-4 md:p-8 flex-1 overflow-y-auto">
-          <ProgressBar currentStep={step} />
-
-          <div className="min-h-[300px] animate-in slide-in-from-right-4 fade-in duration-300">
-            {step === 'identity' && <StepIdentity data={data} updateData={updateData} />}
-            {step === 'contact' && <StepContact data={data} updateData={updateData} />}
-            {step === 'visual' && <StepVisual data={data} updateData={updateData} />}
-          </div>
-        </div>
-
-        {/* Footer Actions */}
-        <div className="p-4 md:p-8 border-t border-gray-100 dark:border-gray-800 bg-white/80 dark:bg-black/80 md:bg-transparent backdrop-blur-sm sticky bottom-0 md:static md:rounded-b-3xl">
-          <div className="flex gap-3">
-            {step !== 'identity' && (
-              <Button variant="outline" onClick={handleBack} className="h-12 w-14 shrink-0 rounded-xl" disabled={isSubmitting}>
-                <ArrowLeft className="w-5 h-5" />
+          {/* Footer Actions */}
+          <div className="sticky bottom-0 bg-white/90 dark:bg-black/90 backdrop-blur-lg py-6 border-t border-gray-100 dark:border-gray-800 -mx-6 px-6 lg:mx-0 lg:px-0 lg:border-none lg:bg-transparent">
+            <div className="flex gap-4">
+              {step !== 'identity' && (
+                <Button variant="outline" onClick={handleBack} className="h-14 w-16 shrink-0 rounded-2xl border-2" disabled={isSubmitting}>
+                  <ArrowLeft className="w-6 h-6" />
+                </Button>
+              )}
+              <Button
+                onClick={handleNext}
+                className="h-14 flex-1 rounded-2xl bg-teal-600 hover:bg-teal-700 text-lg font-bold shadow-xl shadow-teal-600/20 transition-all hover:scale-[1.01]"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Menyimpan..." : (step === 'visual' ? "Daftarkan Toko" : "Lanjut")}
+                {!isSubmitting && step !== 'visual' && <ArrowRight className="w-6 h-6 ml-2" />}
               </Button>
-            )}
-            <Button
-              onClick={handleNext}
-              className="h-12 flex-1 rounded-xl bg-teal-600 hover:bg-teal-700 text-base font-bold shadow-lg shadow-teal-600/20"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Menyimpan..." : (step === 'visual' ? "Daftarkan Toko" : "Lanjut")}
-              {!isSubmitting && step !== 'visual' && <ArrowRight className="w-5 h-5 ml-2" />}
-            </Button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* RIGHT COLUMN: PREVIEW (Desktop Only) */}
-      <div className="hidden md:block w-96 shrink-0 sticky top-24 space-y-6">
-        <div className="bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-xl border border-gray-200 dark:border-gray-800">
-          <h3 className="font-bold text-gray-900 dark:text-white mb-2 text-center">Live Preview</h3>
-          <p className="text-xs text-gray-500 text-center mb-6">
-            Tampilan toko Anda di berbagai posisi aplikasi
-          </p>
+      <div className="hidden lg:flex w-[45%] bg-slate-50 dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 flex-col sticky top-0 h-screen overflow-hidden">
+        <div className="flex-1 flex flex-col items-center justify-center p-12 relative">
+          {/* Background Pattern */}
+          <div className="absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(0,0,0,0.05) 1px, transparent 0)', backgroundSize: '24px 24px' }}></div>
 
-          <Tabs defaultValue="list" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-4 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
-              <TabsTrigger value="list" className="text-[10px] h-7 rounded-lg">List</TabsTrigger>
-              <TabsTrigger value="widget" className="text-[10px] h-7 rounded-lg">Widget</TabsTrigger>
-              <TabsTrigger value="glass" className="text-[10px] h-7 rounded-lg">Glass</TabsTrigger>
-              <TabsTrigger value="story" className="text-[10px] h-7 rounded-lg">Story</TabsTrigger>
-            </TabsList>
-
-            <div className="bg-gray-50 dark:bg-black/20 rounded-2xl p-4 border border-dashed border-gray-200 dark:border-gray-800 min-h-[350px] flex items-center justify-center relative overflow-hidden">
-              <TabsContent value="list" className="w-full mt-0 animate-in zoom-in-50 duration-300">
-                <div className="pointer-events-none select-none flex justify-center">
-                  <MitraCardList data={previewData as any} />
-                </div>
-                <p className="text-[10px] text-gray-400 text-center mt-3">Tampilan di hasil pencarian & list kategori</p>
-              </TabsContent>
-              <TabsContent value="widget" className="w-full mt-0 animate-in zoom-in-50 duration-300 flex flex-col items-center">
-                <div className="pointer-events-none select-none px-2">
-                  <MitraCardWidget data={previewData as any} />
-                </div>
-                <p className="text-[10px] text-gray-400 text-center mt-3">Tampilan di rekomendasi "Favorit"</p>
-              </TabsContent>
-              <TabsContent value="glass" className="w-full mt-0 animate-in zoom-in-50 duration-300 flex flex-col items-center">
-                <div className="pointer-events-none select-none">
-                  <MitraCardGlass data={previewData as any} />
-                </div>
-                <p className="text-[10px] text-gray-400 text-center mt-3">Tampilan di "Lagi Rame"</p>
-              </TabsContent>
-              <TabsContent value="story" className="w-full mt-0 animate-in zoom-in-50 duration-300 flex flex-col items-center">
-                <div className="pointer-events-none select-none">
-                  <MitraCardStory data={previewData as any} />
-                </div>
-                <p className="text-[10px] text-gray-400 text-center mt-3">Tampilan di Story Brand</p>
-              </TabsContent>
+          <div className="relative z-10 w-full max-w-md">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center px-4 py-1.5 rounded-full bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 text-xs font-bold uppercase tracking-wider mb-4 shadow-sm">
+                Live Preview
+              </div>
+              <h3 className="font-bold text-2xl text-gray-900 dark:text-white mb-2">Tampilan Toko Anda</h3>
+              <p className="text-gray-500">
+                Begini tampilan toko Anda di aplikasi pelanggan
+              </p>
             </div>
-          </Tabs>
 
-          <div className="mt-6 p-4 bg-teal-50 dark:bg-teal-900/20 rounded-xl text-center">
-            <p className="text-xs text-teal-700 dark:text-teal-300 font-medium">
-              ✨ Upload logo & cover menarik agar toko Anda semakin dilirik pelanggan!
-            </p>
+            <div className="bg-white dark:bg-black rounded-[2.5rem] p-6 shadow-2xl border-8 border-white dark:border-gray-800 ring-1 ring-gray-900/5 dark:ring-white/10 relative mx-auto transform transition-all duration-500">
+              <Tabs defaultValue="list" className="w-full">
+                <TabsList className="grid w-full grid-cols-4 mb-6 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-2xl">
+                  <TabsTrigger value="list" className="text-xs h-9 rounded-xl font-medium">List</TabsTrigger>
+                  <TabsTrigger value="widget" className="text-xs h-9 rounded-xl font-medium">Widget</TabsTrigger>
+                  <TabsTrigger value="glass" className="text-xs h-9 rounded-xl font-medium">Glass</TabsTrigger>
+                  <TabsTrigger value="story" className="text-xs h-9 rounded-xl font-medium">Story</TabsTrigger>
+                </TabsList>
+
+                <div className="min-h-[300px] flex items-center justify-center relative overflow-hidden bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800">
+                  <TabsContent value="list" className="w-full mt-0 animate-in zoom-in-50 duration-300">
+                    <div className="pointer-events-none select-none flex justify-center py-4">
+                      <MitraCardList data={previewData as any} />
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="widget" className="w-full mt-0 animate-in zoom-in-50 duration-300 flex flex-col items-center">
+                    <div className="pointer-events-none select-none px-2 py-4">
+                      <MitraCardWidget data={previewData as any} />
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="glass" className="w-full mt-0 animate-in zoom-in-50 duration-300 flex flex-col items-center">
+                    <div className="pointer-events-none select-none py-4">
+                      <MitraCardGlass data={previewData as any} />
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="story" className="w-full mt-0 animate-in zoom-in-50 duration-300 flex flex-col items-center">
+                    <div className="pointer-events-none select-none py-4">
+                      <MitraCardStory data={previewData as any} />
+                    </div>
+                  </TabsContent>
+                </div>
+              </Tabs>
+            </div>
+
+            <div className="mt-8 text-center">
+              <p className="text-sm text-gray-400">
+                Design yang profesional meningkatkan kepercayaan pelanggan hingga <span className="text-teal-500 font-bold">85%</span>
+              </p>
+            </div>
           </div>
         </div>
       </div>
