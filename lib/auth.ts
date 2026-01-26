@@ -268,20 +268,69 @@ export async function loginWithEmail(email: string, password: string): Promise<U
         return null;
     }
 
-    // Fetch user profile
-    const { data: profile } = await supabase
+    console.log("Auth successful for:", email, "auth_id:", data.user.id);
+
+    // Try to fetch user profile by auth_id first (more reliable)
+    let { data: profile } = await supabase
         .from("users")
         .select("*")
-        .eq("email", email) // Use email correlation
+        .eq("auth_id", data.user.id)
         .single();
 
+    // If not found by auth_id, try by email
+    if (!profile) {
+        console.log("Profile not found by auth_id, trying email...");
+        const { data: profileByEmail } = await supabase
+            .from("users")
+            .select("*")
+            .eq("email", email)
+            .single();
+
+        profile = profileByEmail;
+
+        // If found by email but missing auth_id, update it
+        if (profile && !profile.auth_id) {
+            console.log("Updating profile with auth_id...");
+            await supabase
+                .from("users")
+                .update({ auth_id: data.user.id })
+                .eq("email", email);
+        }
+    }
+
+    // If still no profile and this is the admin email, auto-create profile
+    if (!profile && email === "rayokurir@gmail.com") {
+        console.log("Creating admin profile for:", email);
+        const adminProfile = {
+            username: "admin",
+            email: email,
+            role: "ADMIN",
+            name: "Super Admin",
+            auth_id: data.user.id
+        };
+
+        const { data: newProfile, error: insertError } = await supabase
+            .from("users")
+            .insert([adminProfile])
+            .select()
+            .single();
+
+        if (insertError) {
+            console.error("Failed to create admin profile:", insertError);
+        } else {
+            profile = newProfile;
+        }
+    }
+
     if (profile) {
+        console.log("Login successful, profile found:", profile.name);
         if (typeof window !== "undefined") {
             sessionStorage.setItem("rk_current_user", JSON.stringify(profile));
         }
         return profile as User;
     }
 
+    console.error("No profile found for email:", email);
     return null;
 }
 
