@@ -95,50 +95,79 @@ export function StepMenu({ data, updateData }: StepMenuProps) {
 
             {/* Add New Item Form */}
             {isAdding && (
-                <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl border border-teal-100 dark:border-teal-900/30 animate-in slide-in-from-bottom-2">
-                    <div className="flex justify-between items-center mb-4">
-                        <span className="font-bold text-sm text-teal-700">Menu Baru</span>
-                        <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)} className="h-6 w-6 p-0 rounded-full">
-                            <X className="w-4 h-4" />
+                <div className="bg-white dark:bg-gray-900 p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-xl shadow-gray-200/50 dark:shadow-black/20 animate-in slide-in-from-bottom-2">
+                    <div className="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 className="font-bold text-lg text-gray-900 dark:text-gray-100">Menu Baru</h3>
+                            <p className="text-sm text-gray-500">Tambahkan detail menu yang akan dijual</p>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => setIsAdding(false)} className="h-8 w-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+                            <X className="w-5 h-5 text-gray-500" />
                         </Button>
                     </div>
 
-                    <div className="space-y-4">
-                        <div>
-                            <Label className="text-xs font-semibold mb-2 block">Foto (Opsional)</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-6 md:gap-8">
+                        {/* Image Section */}
+                        <div className="flex flex-col gap-2">
+                            <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Foto Menu</Label>
                             <ImageUpload
                                 value={newItem.gambar}
                                 onChange={(url) => setNewItem({ ...newItem, gambar: url })}
                                 folder="menus"
                                 aspectRatio="square"
-                                className="w-24 h-24"
-                                placeholder="Foto"
+                                className="w-full aspect-square md:w-36 md:h-36"
+                                placeholder="Foto Menu"
                             />
+                            <p className="text-[10px] text-gray-400 text-center leading-tight">
+                                Disarankan rasio 1:1
+                            </p>
                         </div>
 
-                        <div>
-                            <Label className="text-xs font-semibold">Nama Menu</Label>
-                            <Input
-                                value={newItem.nama}
-                                onChange={e => setNewItem({ ...newItem, nama: e.target.value })}
-                                placeholder="Cth: Nasi Goreng Spesial"
-                                className="h-9 mt-1"
-                                autoFocus
-                            />
-                        </div>
+                        {/* Inputs Section */}
+                        <div className="space-y-5">
+                            <div>
+                                <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block">Nama Menu</Label>
+                                <Input
+                                    value={newItem.nama}
+                                    onChange={e => setNewItem({ ...newItem, nama: e.target.value })}
+                                    placeholder="Contoh: Nasi Goreng Spesial"
+                                    className="h-11 bg-gray-50 dark:bg-gray-800/50"
+                                    autoFocus
+                                />
+                            </div>
 
-                        <div>
-                            <Label className="text-xs font-semibold">Harga</Label>
-                            <Input
-                                type="number"
-                                value={newItem.harga || ""}
-                                onChange={e => setNewItem({ ...newItem, harga: parseInt(e.target.value) || 0 })}
-                                placeholder="0"
-                                className="h-9 mt-1"
-                            />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block">Harga</Label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium text-sm">Rp</span>
+                                        <Input
+                                            type="number"
+                                            value={newItem.harga || ""}
+                                            onChange={e => setNewItem({ ...newItem, harga: parseInt(e.target.value) || 0 })}
+                                            placeholder="0"
+                                            className="h-11 pl-10 bg-gray-50 dark:bg-gray-800/50"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 block">Deskripsi (Opsional)</Label>
+                                    <Input
+                                        value={newItem.deskripsi || ""}
+                                        onChange={e => setNewItem({ ...newItem, deskripsi: e.target.value })}
+                                        placeholder="Penjelasan singkat..."
+                                        className="h-11 bg-gray-50 dark:bg-gray-800/50"
+                                    />
+                                </div>
+                            </div>
                         </div>
+                    </div>
 
-                        <Button onClick={handleSaveItem} className="w-full bg-teal-600 hover:bg-teal-700 h-9 text-sm">
+                    <div className="flex justify-end mt-8 pt-4 border-t border-gray-100 dark:border-gray-800 gap-3">
+                        <Button variant="outline" onClick={() => setIsAdding(false)} className="h-11 px-6">
+                            Batal
+                        </Button>
+                        <Button onClick={handleSaveItem} className="bg-teal-600 hover:bg-teal-700 h-11 px-8 text-white shadow-lg shadow-teal-600/20 font-medium">
                             Simpan Menu
                         </Button>
                     </div>

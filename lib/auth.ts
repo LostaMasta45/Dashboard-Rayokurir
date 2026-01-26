@@ -889,9 +889,11 @@ export async function getMitraById(id: string): Promise<Mitra | null> {
 }
 
 export async function saveMitra(mitra: Mitra): Promise<Mitra | null> {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { type, ...mitraWithoutType } = mitra; // Exclude 'type' as it doesn't exist in the DB schema
     const { data, error } = await supabase
         .from("mitra")
-        .insert([mitra])
+        .insert([mitraWithoutType])
         .select()
         .single();
     if (error) {
@@ -902,9 +904,11 @@ export async function saveMitra(mitra: Mitra): Promise<Mitra | null> {
 }
 
 export async function updateMitra(mitra: Mitra): Promise<Mitra | null> {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { type, ...mitraWithoutType } = mitra; // Exclude 'type' as it doesn't exist in the DB schema
     const { data, error } = await supabase
         .from("mitra")
-        .update({ ...mitra, updatedAt: new Date().toISOString() })
+        .update({ ...mitraWithoutType, updatedAt: new Date().toISOString() })
         .eq("id", mitra.id)
         .select()
         .single();
