@@ -182,7 +182,7 @@ export default function LoginPage() {
 
                     <div className="text-center">
                         <p className="text-xs text-slate-400">
-                            Lupa password? <a href="https://wa.me/6281234567890" target="_blank" className="underline hover:text-teal-600">Hubungi Admin Pusat</a>
+                            Lupa password? <a href="/forgot-password" className="underline hover:text-teal-600">Reset Password</a>
                         </p>
                     </div>
                 </motion.div>
