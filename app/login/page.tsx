@@ -34,8 +34,10 @@ export default function LoginPage() {
             const user = await loginWithEmail(email.trim(), password)
             if (user) {
                 toast.success(`Selamat datang, ${user.name}!`)
-                router.push("/dashboard")
-                router.refresh() // Ensure middleware state updates
+                // Use window.location for full page reload to sync cookies with middleware
+                setTimeout(() => {
+                    window.location.href = "/dashboard"
+                }, 500)
             } else {
                 toast.error("Email atau Password salah")
             }
