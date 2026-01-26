@@ -23,12 +23,22 @@ export default function LandingPage() {
     const currentUser = getCurrentUser()
     setUser(currentUser)
 
+    // Handle Supabase auth callback - detect recovery tokens from hash
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash
+      if (hash && (hash.includes("type=recovery") || hash.includes("access_token"))) {
+        // Redirect to reset-password page with the hash
+        router.push(`/reset-password${hash}`)
+        return
+      }
+    }
+
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20)
     }
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
+  }, [router])
 
   const toggleMenu = () => setIsOpen(!isOpen)
 
