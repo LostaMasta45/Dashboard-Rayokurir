@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
         if (ORS_API_KEY) {
             try {
                 const orsResponse = await fetch(
-                    `https://api.openrouteservice.org/v2/directions/cycling-regular?start=${from.lng},${from.lat}&end=${to.lng},${to.lat}`,
+                    `https://api.openrouteservice.org/v2/directions/driving-car?start=${from.lng},${from.lat}&end=${to.lng},${to.lat}`,
                     {
                         headers: {
                             "Authorization": ORS_API_KEY,

@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Create cache key with version to invalidate old straight-line results
-        const CACHE_VERSION = "v2" // Increment this to clear old cache
+        const CACHE_VERSION = "v3" // Bumped to clear old cycling-regular routes
         const cacheKey = `${CACHE_VERSION}|${waypoints.map(w => `${w.lat.toFixed(6)},${w.lng.toFixed(6)}`).join("|")}`
         const cached = cache.get(cacheKey)
         // Only use cache if it's an ORS result, not a fallback
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
                     // Simple route with start and end
                     const start = `${waypoints[0].lng},${waypoints[0].lat}`
                     const end = `${waypoints[1].lng},${waypoints[1].lat}`
-                    const url = `https://api.openrouteservice.org/v2/directions/cycling-regular?start=${start}&end=${end}`
+                    const url = `https://api.openrouteservice.org/v2/directions/driving-car?start=${start}&end=${end}`
 
                     console.log("Calling ORS GET API:", url)
 
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
                     console.log("Calling ORS POST API with coordinates:", JSON.stringify(orsCoordinates))
 
                     orsResponse = await fetch(
-                        `https://api.openrouteservice.org/v2/directions/cycling-regular/geojson`,
+                        `https://api.openrouteservice.org/v2/directions/driving-car/geojson`,
                         {
                             method: "POST",
                             headers: {
