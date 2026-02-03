@@ -70,7 +70,6 @@ interface MapPickerProps {
     showRoute?: boolean
     selectionMode?: "pickup" | "dropoff" | null
     onCenterChange?: (lat: number, lng: number) => void
-    flyTo?: { lat: number, lng: number } | null
 }
 
 // Draggable Marker Component
@@ -122,6 +121,8 @@ function MapBoundsUpdater({ pickup, dropoff, basecamp, routeCoords, selectionMod
         if (selectionMode) return // Don't auto-fit in selection mode, let user pan freely
 
         // Only auto-fit on first load or significant route changes if not manually interacting
+        // meaningful interactions logic omitted for brevity, but sticking to basic prop changes
+
         if (routeCoords.length > 0) {
             const bounds = L.latLngBounds(routeCoords)
             map.fitBounds(bounds, { padding: [80, 80], maxZoom: 16 })
@@ -140,6 +141,20 @@ function MapBoundsUpdater({ pickup, dropoff, basecamp, routeCoords, selectionMod
     return null
 }
 
+// Map Center Listener
+function MapCenterListener({ onCenterChange }: { onCenterChange?: (lat: number, lng: number) => void }) {
+    const map = useMap()
+    useMapEvents({
+        moveend: () => {
+            if (onCenterChange) {
+                const center = map.getCenter()
+                onCenterChange(center.lat, center.lng)
+            }
+        }
+    })
+    return null
+}
+
 // Robust resize handler using ResizeObserver
 function MapResizeHandler() {
     const map = useMap()
@@ -153,6 +168,8 @@ function MapResizeHandler() {
         })
 
         resizeObserver.observe(container)
+
+        // Initial invalidation to be safe
         map.invalidateSize()
 
         return () => {
@@ -160,6 +177,7 @@ function MapResizeHandler() {
         }
     }, [map])
 
+    // Also invalidate when the tab becomes visible again (common mobile browser issue)
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
@@ -186,46 +204,6 @@ function MapClickHandler({
     })
     return null
 }
-function MapFlyTo({ target }: { target: { lat: number, lng: number } | null }) {
-    const map = useMap()
-
-    useEffect(() => {
-        if (!target) return
-        map.flyTo([target.lat, target.lng], 16, {
-            animate: true,
-            duration: 1.5
-        })
-    }, [target, map])
-
-    return null
-}
-
-// Map Event Listener for Moving State
-function MapStateListener({ onMoveStart, onMoveEnd, onCenterChange }: {
-    onMoveStart: () => void,
-    onMoveEnd: () => void,
-    onCenterChange?: (lat: number, lng: number) => void
-}) {
-    const map = useMap()
-    useMapEvents({
-        movestart: () => onMoveStart(),
-        moveend: () => {
-            onMoveEnd()
-            if (onCenterChange) {
-                const center = map.getCenter()
-                onCenterChange(center.lat, center.lng)
-            }
-        },
-        zoomend: () => {
-            // ensure we capture center update on zoom too
-            if (onCenterChange) {
-                const center = map.getCenter()
-                onCenterChange(center.lat, center.lng)
-            }
-        }
-    })
-    return null
-}
 
 export function MapPicker({
     pickup,
@@ -237,15 +215,15 @@ export function MapPicker({
     showRoute = true,
     selectionMode = null,
     onCenterChange,
-    flyTo = null
 }: MapPickerProps) {
     const [activeMode, setActiveMode] = useState<"pickup" | "dropoff" | null>(null)
     const [routeCoords, setRouteCoords] = useState<[number, number][]>([])
     const [isLoadingRoute, setIsLoadingRoute] = useState(false)
-    const [isMapMoving, setIsMapMoving] = useState(false)
     const { resolvedTheme } = useTheme()
+    const isDark = resolvedTheme === "dark"
 
     // Calculate center point
+    // If in selection mode, we trust the parent to have set the center initially via props or we default to the location being edited
     const center: [number, number] = selectionMode === "pickup" && pickup
         ? [pickup.lat, pickup.lng]
         : selectionMode === "dropoff" && dropoff
@@ -256,10 +234,10 @@ export function MapPicker({
                     ? [dropoff.lat, dropoff.lng]
                     : [basecamp.lat, basecamp.lng]
 
-    // Fetch route geometry when pickup and dropoff change (scrapped for brevity, keep existing logic)
+    // Fetch route geometry when pickup and dropoff change
     useEffect(() => {
         async function fetchRouteGeometry() {
-            if (!pickup || !dropoff || selectionMode) {
+            if (!pickup || !dropoff || selectionMode) { // Don't fetch route in selection mode (distracting)
                 if (selectionMode) setRouteCoords([])
                 else setRouteCoords([])
                 return
@@ -284,29 +262,51 @@ export function MapPicker({
                     if (data.coordinates && data.coordinates.length > 0) {
                         setRouteCoords(data.coordinates)
                     } else {
-                        setRouteCoords([[basecamp.lat, basecamp.lng], [pickup.lat, pickup.lng], [dropoff.lat, dropoff.lng]])
+                        // Fallback to straight lines
+                        setRouteCoords([
+                            [basecamp.lat, basecamp.lng],
+                            [pickup.lat, pickup.lng],
+                            [dropoff.lat, dropoff.lng]
+                        ])
                     }
                 } else {
-                    setRouteCoords([[basecamp.lat, basecamp.lng], [pickup.lat, pickup.lng], [dropoff.lat, dropoff.lng]])
+                    // Fallback to straight lines
+                    setRouteCoords([
+                        [basecamp.lat, basecamp.lng],
+                        [pickup.lat, pickup.lng],
+                        [dropoff.lat, dropoff.lng]
+                    ])
                 }
             } catch (error) {
                 console.error("Error fetching route geometry:", error)
-                setRouteCoords([[basecamp.lat, basecamp.lng], [pickup.lat, pickup.lng], [dropoff.lat, dropoff.lng]])
+                // Fallback to straight lines
+                setRouteCoords([
+                    [basecamp.lat, basecamp.lng],
+                    [pickup.lat, pickup.lng],
+                    [dropoff.lat, dropoff.lng]
+                ])
             } finally {
                 setIsLoadingRoute(false)
             }
         }
+
         fetchRouteGeometry()
     }, [pickup, dropoff, basecamp, selectionMode])
 
+    // Handle marker drag
     const handlePickupDrag = (lat: number, lng: number) => {
-        if (onPickupChange) onPickupChange({ lat, lng, label: "Custom" })
+        if (onPickupChange) {
+            onPickupChange({ lat, lng, label: "Custom" })
+        }
     }
 
     const handleDropoffDrag = (lat: number, lng: number) => {
-        if (onDropoffChange) onDropoffChange({ lat, lng, label: "Custom" })
+        if (onDropoffChange) {
+            onDropoffChange({ lat, lng, label: "Custom" })
+        }
     }
 
+    // Handle map click
     const handleMapClick = (lat: number, lng: number) => {
         if (activeMode === "pickup" && onPickupChange) {
             onPickupChange({ lat, lng, label: "Lokasi Jemput" })
@@ -317,20 +317,24 @@ export function MapPicker({
         }
     }
 
+    // Determine current step for guidance
     const getGuidanceText = () => {
         if (selectionMode) return { text: "Geser peta untuk menentukan titik", color: selectionMode === "pickup" ? "teal" : "orange", icon: <GripVertical size={16} /> }
+
         if (activeMode === "pickup") return { text: "Klik di peta untuk lokasi JEMPUT", color: "teal", icon: <MapPin size={16} /> }
         if (activeMode === "dropoff") return { text: "Klik di peta untuk lokasi ANTAR", color: "orange", icon: <Navigation size={16} /> }
+
         if (!pickup) return { text: "Set lokasi jemput", color: "gray", icon: <MapPin size={16} /> }
         if (!dropoff) return { text: "Set lokasi antar", color: "gray", icon: <Navigation size={16} /> }
         return { text: "Geser marker untuk akurasi", color: "gray", icon: <GripVertical size={16} /> }
     }
+
     const guidance = getGuidanceText()
 
     return (
         <div className={cn("relative h-full w-full bg-slate-50 dark:bg-gray-900 transition-colors", className)}>
 
-            {/* Top Floating Bar for Guidance & Mode - Hide if in Selection Mode */}
+            {/* Top Floating Bar for Guidance & Mode - Hide if in Selection Mode (Modal handles header) */}
             {!selectionMode && (
                 <div className="absolute top-4 inset-x-4 z-[500] pointer-events-none flex justify-center">
                     <div className={cn(
@@ -345,6 +349,7 @@ export function MapPicker({
                             {activeMode ? <Crosshair size={18} className="animate-pulse" /> : guidance.icon}
                             <span>{guidance.text}</span>
                         </div>
+
                         {isLoadingRoute && <Loader2 size={16} className="animate-spin text-teal-500" />}
                     </div>
                 </div>
@@ -353,45 +358,27 @@ export function MapPicker({
             {/* Center Pin Overlay (Selection Mode Only) */}
             {selectionMode && (
                 <div className="absolute inset-0 z-[1000] pointer-events-none flex items-center justify-center pb-[0px]">
-                    {/* The Pin Area */}
-                    <div className="relative flex flex-col items-center">
-
-                        {/* Tooltip Instruction - context aware */}
+                    {/* The Pin */}
+                    <div className="relative">
+                        {/* Circle */}
                         <div className={cn(
-                            "absolute -top-16 bg-gray-900 text-white text-xs px-3 py-1.5 rounded-lg shadow-xl font-medium transition-all duration-300",
-                            isMapMoving ? "opacity-0 translate-y-2" : "opacity-100 translate-y-0"
-                        )}>
-                            Lepas untuk pilih lokasi ini
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
-                        </div>
-
-                        {/* The Pin Circle */}
-                        <div className={cn(
-                            "w-12 h-12 rounded-full border-[3px] border-white shadow-2xl flex items-center justify-center transition-all duration-300 ease-out",
-                            selectionMode === 'pickup' ? "bg-teal-500 ring-4 ring-teal-500/20" : "bg-orange-500 ring-4 ring-orange-500/20",
-                            isMapMoving ? "-translate-y-4 scale-110 shadow-2xl" : "translate-y-0 scale-100"
-                        )} style={{ marginBottom: isMapMoving ? "28px" : "20px" }}>
+                            "w-12 h-12 rounded-full border-[3px] border-white shadow-2xl flex items-center justify-center transition-all animate-bounce",
+                            selectionMode === 'pickup' ? "bg-teal-500 ring-4 ring-teal-500/20" : "bg-orange-500 ring-4 ring-orange-500/20"
+                        )} style={{ marginBottom: "20px" }}>
                             {selectionMode === 'pickup' ? (
                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                     <circle cx="12" cy="10" r="3" />
                                     <path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z" />
                                 </svg>
                             ) : (
-                                <Navigation size={20} className="text-white fill-white" />
+                                <Navigation className="text-white fill-white" size={20} />
                             )}
                         </div>
-
                         {/* Stick Effect */}
-                        <div className={cn(
-                            "absolute left-1/2 -translate-x-1/2 w-[3px] bg-gray-600/50 rounded-full transition-all duration-300",
-                            isMapMoving ? "h-[20px] bottom-[28px] opacity-30" : "h-[20px] bottom-[20px] opacity-100"
-                        )}></div>
+                        <div className="absolute bottom-[20px] left-1/2 -translate-x-1/2 w-[2px] h-[20px] bg-gray-800/50 rounded-full"></div>
 
                         {/* Shadow on ground */}
-                        <div className={cn(
-                            "absolute bottom-0 left-1/2 -translate-x-1/2 bg-black/20 rounded-full blur-[1px] transition-all duration-300",
-                            isMapMoving ? "w-2 h-1 opacity-20" : "w-4 h-2 opacity-40"
-                        )}></div>
+                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3 h-1.5 bg-black/20 rounded-full blur-[1px]"></div>
                     </div>
                 </div>
             )}
@@ -399,56 +386,142 @@ export function MapPicker({
             {/* Right Side Control Buttons - Floating - Hide in selection mode */}
             {!selectionMode && (
                 <div className="absolute top-20 right-4 z-[500] flex flex-col gap-3">
+                    {/* Pickup Toggle */}
                     <button
                         onClick={() => setActiveMode(activeMode === "pickup" ? null : "pickup")}
-                        className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-xl hover:scale-105 active:scale-95", activeMode === "pickup" ? "bg-teal-500 text-white ring-4 ring-teal-500/30" : "bg-white text-gray-500 hover:text-teal-600")}
+                        className={cn(
+                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-xl hover:scale-105 active:scale-95",
+                            activeMode === "pickup"
+                                ? "bg-teal-500 text-white ring-4 ring-teal-500/30"
+                                : "bg-white text-gray-500 hover:text-teal-600"
+                        )}
+                        title="Set Jemput di Peta"
                     >
                         <MapPin size={22} className={activeMode === "pickup" ? "fill-current" : ""} />
                     </button>
+
+                    {/* Dropoff Toggle */}
                     <button
                         onClick={() => setActiveMode(activeMode === "dropoff" ? null : "dropoff")}
-                        className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-xl hover:scale-105 active:scale-95", activeMode === "dropoff" ? "bg-orange-500 text-white ring-4 ring-orange-500/30" : "bg-white text-gray-500 hover:text-orange-600")}
+                        className={cn(
+                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-xl hover:scale-105 active:scale-95",
+                            activeMode === "dropoff"
+                                ? "bg-orange-500 text-white ring-4 ring-orange-500/30"
+                                : "bg-white text-gray-500 hover:text-orange-600"
+                        )}
+                        title="Set Antar di Peta"
                     >
                         <Navigation size={22} className={activeMode === "dropoff" ? "fill-current" : ""} />
                     </button>
                 </div>
             )}
 
+            {/* Legend - Hide in selection mode */}
+            {!selectionMode && (
+                <div className="absolute bottom-6 left-4 z-[500] hidden sm:block">
+                    <div className="bg-white/80 backdrop-blur-md p-2 rounded-lg shadow-sm border border-white/50 flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2 text-[10px] font-medium text-gray-600">
+                            <div className="w-2 h-2 rounded-full bg-teal-500"></div> Jemput
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-medium text-gray-600">
+                            <div className="w-2 h-2 rounded-full bg-orange-500"></div> Antar
+                        </div>
+                    </div>
+                </div>
+            )}
+
+
             {/* Map Container */}
             <MapContainer
                 center={center}
-                zoom={16}
+                zoom={16} // Closer zoom for selection
                 scrollWheelZoom={true}
                 className="h-full w-full z-0"
                 style={{ background: "#f8fafc" }}
-                zoomControl={false}
+                zoomControl={false} // We will add custom if needed, or stick to default placement if we didn't block it
             >
-                <TileLayer attribution='&copy; CARTO' url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-
-                <MapResizeHandler />
-                <MapBoundsUpdater pickup={pickup} dropoff={dropoff} basecamp={basecamp} routeCoords={routeCoords} selectionMode={selectionMode} />
-                <MapFlyTo target={flyTo} />
-
-                {/* Simplified Event Listener for Selection Mode */}
-                <MapStateListener
-                    onMoveStart={() => setIsMapMoving(true)}
-                    onMoveEnd={() => setIsMapMoving(false)}
-                    onCenterChange={selectionMode ? onCenterChange : undefined}
+                {/* Clean, Elegant Map Tiles - Switch based on theme */}
+                <TileLayer
+                    attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
+                    url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
                 />
 
-                <Marker position={[basecamp.lat, basecamp.lng]} icon={basecampIcon} />
-                {pickup && onPickupChange && selectionMode !== 'pickup' && <DraggableMarker position={[pickup.lat, pickup.lng]} icon={pickupIcon} onDragEnd={handlePickupDrag} />}
-                {dropoff && onDropoffChange && selectionMode !== 'dropoff' && <DraggableMarker position={[dropoff.lat, dropoff.lng]} icon={dropoffIcon} onDragEnd={handleDropoffDrag} />}
+                {/* Fix blank map on mobile */}
+                <MapResizeHandler />
 
+                {/* Bounds Updater */}
+                <MapBoundsUpdater
+                    pickup={pickup}
+                    dropoff={dropoff}
+                    basecamp={basecamp}
+                    routeCoords={routeCoords}
+                    selectionMode={selectionMode}
+                />
+
+                {/* Center Listener */}
+                {selectionMode && onCenterChange && (
+                    <MapCenterListener onCenterChange={onCenterChange} />
+                )}
+
+                {/* Basecamp Marker (not draggable) */}
+                <Marker position={[basecamp.lat, basecamp.lng]} icon={basecampIcon} />
+
+                {/* Pickup Marker - Draggable - Hide current editing selection in selectionMode */}
+                {pickup && onPickupChange && selectionMode !== 'pickup' && (
+                    <DraggableMarker
+                        position={[pickup.lat, pickup.lng]}
+                        icon={pickupIcon}
+                        onDragEnd={handlePickupDrag}
+                    />
+                )}
+
+                {/* Dropoff Marker - Draggable - Hide current editing selection in selectionMode */}
+                {dropoff && onDropoffChange && selectionMode !== 'dropoff' && (
+                    <DraggableMarker
+                        position={[dropoff.lat, dropoff.lng]}
+                        icon={dropoffIcon}
+                        onDragEnd={handleDropoffDrag}
+                    />
+                )}
+
+                {/* Route Line - Now follows roads! */}
                 {!selectionMode && showRoute && routeCoords.length > 1 && (
                     <>
-                        <Polyline positions={routeCoords} pathOptions={{ color: "#0d9488", weight: 8, opacity: 0.2 }} />
-                        <Polyline positions={routeCoords} pathOptions={{ color: "#14B8A6", weight: 5, opacity: 0.9 }} />
+                        {/* Shadow line */}
+                        <Polyline
+                            positions={routeCoords}
+                            pathOptions={{
+                                color: "#0d9488", // teal-600
+                                weight: 8,
+                                opacity: 0.2,
+                            }}
+                        />
+                        {/* Main line */}
+                        <Polyline
+                            positions={routeCoords}
+                            pathOptions={{
+                                color: "#14B8A6", // teal-500
+                                weight: 5,
+                                opacity: 0.9,
+                            }}
+                        />
                     </>
                 )}
 
-                {activeMode && !selectionMode && <MapClickHandler onMapClick={handleMapClick} />}
+                {/* Click Handler when in active mode */}
+                {activeMode && !selectionMode && (
+                    <MapClickHandler onMapClick={handleMapClick} />
+                )}
             </MapContainer>
+
+            {/* Active Mode Cursor Instruction (Optional, maybe too much UI) */}
+            {activeMode && !selectionMode && (
+                <div className="absolute inset-0 pointer-events-none z-[400] bg-black/5 flex items-center justify-center">
+                    <div className="bg-black/70 text-white px-3 py-1.5 rounded-full text-sm font-medium animate-bounce shadow-xl">
+                        Klik Peta
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
