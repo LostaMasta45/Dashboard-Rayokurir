@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { ArrowUpDown, Zap, MessageCircle, Calculator, Clock, Route, Info, Loader2, Map as MapIcon, Share2, Copy, Check, MapPin, ChevronRight, Navigation, ChevronDown, ChevronUp } from "lucide-react"
+import { ArrowUpDown, Zap, MessageCircle, Calculator, Clock, Route, Info, Loader2, Map as MapIcon, Share2, Copy, Check, MapPin, ChevronRight, Navigation, ChevronDown, ChevronUp, ArrowLeft, Crosshair } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
@@ -47,8 +47,14 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
     const [status, setStatus] = useState<Status>("idle")
     const [result, setResult] = useState<CalculationResult | null>(null)
     const [notes, setNotes] = useState("")
-    const [showMap, setShowMap] = useState(false) // Default hidden on mobile
+    const [showMap, setShowMap] = useState(false) // For Desktop/Overview Mobile
     const [isCopied, setIsCopied] = useState(false)
+
+    // Selection Mode State (Mobile Full Screen)
+    const [selectingMode, setSelectingMode] = useState<"pickup" | "dropoff" | null>(null)
+    const [tempLocation, setTempLocation] = useState<Location | null>(null)
+    const [isGeocoding, setIsGeocoding] = useState(false)
+    const geocodeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
     // Load from URL params on mount
     useEffect(() => {
@@ -128,7 +134,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                 totalDurationMinutes: d1DurationMinutes + d2DurationMinutes
             })
             setStatus("ready")
-            setShowMap(false) // Auto switch to form on result ready (mobile)
+            // setShowMap(false) // Don't auto-hide map on mobile anymore, let user decide
 
         } catch (error) {
             console.error("Route calculation error:", error)
@@ -149,7 +155,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                 totalDurationMinutes: d1DurationMinutes + d2DurationMinutes
             })
             setStatus("ready")
-            setShowMap(false)
+            // setShowMap(false)
         }
     }, [pickup, dropoff, isExpress])
 
@@ -225,8 +231,8 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
     }, [generateShareableUrl])
 
     // Map locations
-    const mapPickup = pickup ? { lat: pickup.lat, lng: pickup.lng, label: pickup.label } : null
-    const mapDropoff = dropoff ? { lat: dropoff.lat, lng: dropoff.lng, label: dropoff.label } : null
+    const mapPickup = selectingMode === 'pickup' && tempLocation ? tempLocation : pickup
+    const mapDropoff = selectingMode === 'dropoff' && tempLocation ? tempLocation : dropoff
     const mapBasecamp = { lat: BASECAMP.lat, lng: BASECAMP.lng, label: BASECAMP.label }
 
     const reverseGeocode = async (lat: number, lng: number) => {
@@ -243,10 +249,10 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
     }
 
     const handleMapPickupChange = useCallback(async (loc: { lat: number; lng: number; label?: string }) => {
+        // Only used for Desktop drag/click - for Mobile Selection logic see handleCenterChange
         // Short coordinate format for display
         const shortCoord = `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`
 
-        // Immediate update with coordinates (so form is never empty)
         setPickup({
             id: `custom-pickup-${Date.now()}`,
             label: `Titik Peta (${shortCoord})`,
@@ -254,10 +260,8 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
             lng: loc.lng
         })
 
-        // Async fetch address to improve label
         const address = await reverseGeocode(loc.lat, loc.lng)
         if (address) {
-            // Show address + coordinates: "Kali Gunting (-7.5133, 112.3476)"
             setPickup({
                 id: `custom-pickup-${Date.now()}`,
                 label: `${address} (${shortCoord})`,
@@ -270,7 +274,6 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
     const handleMapDropoffChange = useCallback(async (loc: { lat: number; lng: number; label?: string }) => {
         const shortCoord = `${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`
 
-        // Immediate update with coordinates (so form is never empty)
         setDropoff({
             id: `custom-dropoff-${Date.now()}`,
             label: `Titik Peta (${shortCoord})`,
@@ -278,10 +281,8 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
             lng: loc.lng
         })
 
-        // Async fetch address to improve label
         const address = await reverseGeocode(loc.lat, loc.lng)
         if (address) {
-            // Show address + coordinates
             setDropoff({
                 id: `custom-dropoff-${Date.now()}`,
                 label: `${address} (${shortCoord})`,
@@ -291,6 +292,61 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
         }
     }, [])
 
+    // New: Handle Center Change in Selection Mode
+    const handleCenterChange = (lat: number, lng: number) => {
+        if (!selectingMode) return
+
+        const shortCoord = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+
+        // Immediate update with coord label
+        setTempLocation({
+            id: 'temp',
+            lat,
+            lng,
+            label: `Titik (${shortCoord})`
+        })
+        setIsGeocoding(true)
+
+        // Debounce geocoding
+        if (geocodeTimeoutRef.current) {
+            clearTimeout(geocodeTimeoutRef.current)
+        }
+
+        geocodeTimeoutRef.current = setTimeout(async () => {
+            const address = await reverseGeocode(lat, lng)
+            if (address) {
+                setTempLocation(prev => prev ? { ...prev, label: address } : null)
+            }
+            setIsGeocoding(false)
+        }, 800)
+    }
+
+    const openSelectionMode = (mode: "pickup" | "dropoff") => {
+        setSelectingMode(mode)
+        // Set initial temp location to current pickup/dropoff or center or Basecamp
+        const currentLoc = mode === "pickup" ? pickup : dropoff
+
+        if (currentLoc) {
+            setTempLocation(currentLoc)
+        } else {
+            // If no location set, try to default to the other one, or basecamp
+            const otherLoc = mode === "pickup" ? dropoff : pickup
+            setTempLocation(otherLoc || { ...BASECAMP, id: 'basecamp' })
+        }
+    }
+
+    const confirmSelection = () => {
+        if (!selectingMode || !tempLocation) return
+
+        if (selectingMode === "pickup") {
+            setPickup({ ...tempLocation, id: `picked-pickup-${Date.now()}` })
+        } else {
+            setDropoff({ ...tempLocation, id: `picked-dropoff-${Date.now()}` })
+        }
+        setSelectingMode(null)
+        setTempLocation(null)
+    }
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -298,20 +354,32 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
             className={`bg-white/80 dark:bg-gray-900/60 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl shadow-gray-200/50 dark:shadow-black/50 border border-white/50 dark:border-white/10 relative overflow-hidden transition-all duration-500 ${className}`}
         >
             <div className={cn("grid gap-0 relative", !compact && "lg:grid-cols-2")}>
+
                 {/* 
-                  Map Section 
-                  - Mobile: Toggleable overlay or separate view
-                  - Desktop: Left column (unless compact)
+                  Desktop Map View 
+                  - Visible on Desktop
+                  - Visible on Mobile ONLY if showMap is true AND we are NOT in selection mode (selection mode takes over full screen)
                 */}
                 <div className={cn(
                     "h-[400px] bg-slate-50 relative transition-all duration-300 ease-in-out",
                     !compact && "lg:block lg:h-auto lg:min-h-[600px]",
-                    showMap ? "block" : "hidden"
+                    showMap && !selectingMode ? "block" : "hidden"
                 )}>
+                    {/* 
+                         We reuse MapPicker here. 
+                         When in desktop mode, it works as before (showing markers).
+                     */}
                     <div className="absolute inset-0">
+                        {/* Only render this instance if NOT selecting mode to avoid conflict? 
+                             Actually, we can just hide it with CSS to preserve state, 
+                             but for mobile performance, unmounting might be better if we use a different instance for the modal.
+                             Let's keep one instance if possible to avoid re-renders, but since we need full screen modal...
+                             The Desktop Left Panel creates a context. The Mobile Modal creates another. Leaflet doesn't like shared contexts.
+                             So we will have TWO MapPickers. One here, one in the Modal.
+                         */}
                         <MapPicker
-                            pickup={mapPickup}
-                            dropoff={mapDropoff}
+                            pickup={pickup ? { lat: pickup.lat, lng: pickup.lng, label: pickup.label } : null}
+                            dropoff={dropoff ? { lat: dropoff.lat, lng: dropoff.lng, label: dropoff.label } : null}
                             basecamp={mapBasecamp}
                             onPickupChange={handleMapPickupChange}
                             onDropoffChange={handleMapDropoffChange}
@@ -319,7 +387,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                             showRoute={true}
                         />
                     </div>
-                    {/* Close Map Button */}
+                    {/* Close Map Button (Mobile only) */}
                     <div className={cn("absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000]", !compact && "lg:hidden")}>
                         <Button
                             onClick={() => setShowMap(false)}
@@ -350,7 +418,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                             )}
                         >
                             <MapIcon size={16} className="mr-2" />
-                            {showMap ? "Sembunyikan Peta" : "Lihat Peta"}
+                            {showMap ? "Sembunyikan" : "Lihat Rute"}
                         </Button>
                     </div>
 
@@ -365,11 +433,15 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                                     <div className="w-2 h-2 rounded-full bg-teal-500 shadow-[0_0_0_4px_rgba(20,184,166,0.1)]"></div>
                                     Lokasi Jemput
                                 </label>
-                                {pickup?.id.startsWith("custom") && (
-                                    <span className="text-[10px] bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded-full font-medium">
-                                        Dari Peta
-                                    </span>
-                                )}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => openSelectionMode("pickup")}
+                                    className="h-6 text-[10px] px-2 text-teal-600 hover:text-teal-700 hover:bg-teal-50 -mr-2"
+                                >
+                                    <MapPin size={12} className="mr-1" />
+                                    Pilih lewat Peta
+                                </Button>
                             </div>
                             <LocationSearchInput
                                 onSelect={(loc) => {
@@ -402,11 +474,15 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                                     <div className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_0_4px_rgba(249,115,22,0.1)]"></div>
                                     Tujuan Antar
                                 </label>
-                                {dropoff?.id.startsWith("custom") && (
-                                    <span className="text-[10px] bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full font-medium">
-                                        Dari Peta
-                                    </span>
-                                )}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => openSelectionMode("dropoff")}
+                                    className="h-6 text-[10px] px-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 -mr-2"
+                                >
+                                    <Navigation size={12} className="mr-1" />
+                                    Pilih lewat Peta
+                                </Button>
                             </div>
                             <LocationSearchInput
                                 onSelect={(loc) => {
@@ -647,6 +723,107 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
 
                 </div>
             </div>
+
+            {/* FULL SCREEN SELECTION MAP MODAL (Mobile Focused) */}
+            <AnimatePresence>
+                {selectingMode && (
+                    <motion.div
+                        initial={{ opacity: 0, y: "100%" }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: "100%" }}
+                        transition={{ duration: 0.3, ease: "circOut" }}
+                        className="fixed inset-0 z-[9999] bg-white dark:bg-black flex flex-col"
+                    >
+                        {/* Header */}
+                        <div className="absolute top-0 inset-x-0 z-[10000] p-4 flex items-center justify-between bg-gradient-to-b from-white/90 to-transparent dark:from-black/90 pt-6">
+                            <Button
+                                variant="secondary"
+                                size="icon"
+                                onClick={() => setSelectingMode(null)}
+                                className="rounded-full bg-white/80 backdrop-blur shadow-sm h-10 w-10 border border-gray-100"
+                            >
+                                <ArrowLeft size={20} className="text-gray-800" />
+                            </Button>
+                            <div className="px-4 py-2 bg-white/90 backdrop-blur rounded-full shadow-lg border border-gray-100 flex items-center gap-2">
+                                {selectingMode === 'pickup' ? (
+                                    <>
+                                        <div className="w-2 h-2 rounded-full bg-teal-500"></div>
+                                        <span className="font-bold text-sm text-teal-700">Pilih Titik Jemput</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                                        <span className="font-bold text-sm text-orange-700">Pilih Titik Antar</span>
+                                    </>
+                                )}
+                            </div>
+                            <div className="w-10" /> {/* Spacer */}
+                        </div>
+
+                        {/* Map */}
+                        <div className="flex-1 relative bg-slate-100" style={{ minHeight: 'calc(100vh - 200px)' }}>
+                            {/* Separate Map Instance for Selection Mode */}
+                            {tempLocation && (
+                                <div className="absolute inset-0">
+                                    <MapPicker
+                                        pickup={selectingMode === 'pickup' ? tempLocation : null}
+                                        dropoff={selectingMode === 'dropoff' ? tempLocation : null}
+                                        basecamp={mapBasecamp}
+                                        className="h-full w-full"
+                                        showRoute={false}
+                                        selectionMode={selectingMode}
+                                        onCenterChange={handleCenterChange}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer Card */}
+                        <div className="bg-white dark:bg-gray-900 p-6 pb-8 rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-[10000] border-t border-gray-100 relative">
+                            {/* Drag Handle */}
+                            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-gray-200 rounded-full" />
+
+                            <div className="mb-4">
+                                <p className="text-xs uppercase tracking-wider font-bold text-gray-400 mb-1">
+                                    Lokasi Terpilih
+                                </p>
+                                <div className="flex items-start gap-3">
+                                    <div className={cn(
+                                        "mt-1 w-5 h-5 rounded-full flex items-center justify-center shrink-0",
+                                        selectingMode === 'pickup' ? "bg-teal-100 text-teal-600" : "bg-orange-100 text-orange-600"
+                                    )}>
+                                        <MapPin size={12} className="fill-current" />
+                                    </div>
+                                    <div className="flex-1">
+                                        {isGeocoding ? (
+                                            <div className="h-5 w-48 bg-gray-200 animate-pulse rounded" />
+                                        ) : (
+                                            <p className="font-semibold text-gray-900 dark:text-white leading-snug">
+                                                {tempLocation?.label || "Sedang memuat..."}
+                                            </p>
+                                        )}
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            {tempLocation?.lat.toFixed(6)}, {tempLocation?.lng.toFixed(6)}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <Button
+                                onClick={confirmSelection}
+                                className={cn(
+                                    "w-full h-14 rounded-2xl font-bold text-lg shadow-xl mb-safe",
+                                    selectingMode === 'pickup'
+                                        ? "bg-teal-600 hover:bg-teal-700 text-white shadow-teal-500/30"
+                                        : "bg-orange-600 hover:bg-orange-700 text-white shadow-orange-500/30"
+                                )}
+                            >
+                                Konfirmasi Lokasi
+                            </Button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </motion.div>
     )
 }

@@ -1,7 +1,5 @@
 /* Leaflet Map Styles */
-
-/* Import Leaflet CSS - required for proper map rendering */
-@import 'leaflet/dist/leaflet.css';
+/* Note: leaflet/dist/leaflet.css is imported directly in MapPicker.tsx */
 
 /* Custom marker animations */
 .custom-marker {
@@ -92,4 +90,14 @@
         line-height: 32px !important;
         font-size: 16px !important;
     }
+}
+
+/* Fix for tile loading in mobile - ensure tile images are visible */
+.leaflet-tile-pane {
+    z-index: 200 !important;
+}
+
+.leaflet-tile {
+    visibility: visible !important;
+    opacity: 1 !important;
 }
