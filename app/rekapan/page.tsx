@@ -35,7 +35,10 @@ import {
     ArrowUp,
     Filter,
     Moon,
-    Sun
+    Sun,
+    Download,
+    MessageCircle,
+    Send
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
@@ -66,6 +69,7 @@ interface UMKM {
     zona: string;
     brosur_disebar: boolean;
     daftar_mitra: boolean;
+    sudah_kirim_wa: boolean;
     wa: string;
     catatan: string;
     sort_order: number;
@@ -185,6 +189,20 @@ function SortableItem({
                                 <Users className="h-4 w-4" />
                                 <span>Mitra</span>
                                 {item.daftar_mitra && <Check className="h-3 w-3 ml-1" />}
+                            </button>
+
+                            <button
+                                onClick={() => onUpdate(item.id, "sudah_kirim_wa", !item.sudah_kirim_wa)}
+                                className={`
+                                    flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors border
+                                    ${item.sudah_kirim_wa
+                                        ? "bg-purple-50 border-purple-200 text-purple-700 dark:bg-purple-900/20 dark:border-purple-800 dark:text-purple-400"
+                                        : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100 dark:bg-muted/50 dark:border-border dark:text-muted-foreground"}
+                                `}
+                            >
+                                <Send className="h-4 w-4" />
+                                <span>WA</span>
+                                {item.sudah_kirim_wa && <Check className="h-3 w-3 ml-1" />}
                             </button>
                         </div>
 
@@ -380,6 +398,7 @@ export default function RekapanPage() {
     const [editItem, setEditItem] = useState<UMKM | null>(null);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
+    const [previewKey, setPreviewKey] = useState(0); // For refreshing spintax preview
     const { theme, setTheme } = useTheme();
 
     const sensors = useSensors(
@@ -566,6 +585,9 @@ export default function RekapanPage() {
             statusFilter === "ALL" ||
             (statusFilter === "BROSUR" && item.brosur_disebar) ||
             (statusFilter === "MITRA" && item.daftar_mitra) ||
+            (statusFilter === "PUNYA_WA" && item.wa && item.wa.trim() !== "") ||
+            (statusFilter === "SUDAH_WA" && item.sudah_kirim_wa) ||
+            (statusFilter === "BELUM_WA" && item.wa && item.wa.trim() !== "" && !item.sudah_kirim_wa) ||
             (statusFilter === "BELUM" && !item.brosur_disebar && !item.daftar_mitra);
         return matchSearch && matchZona && matchStatus;
     });
@@ -575,8 +597,232 @@ export default function RekapanPage() {
         total: umkmList.length,
         brosur: umkmList.filter((i) => i.brosur_disebar).length,
         mitra: umkmList.filter((i) => i.daftar_mitra).length,
+        hasWa: umkmList.filter((i) => i.wa && i.wa.trim() !== "").length,
+        sudahKirimWa: umkmList.filter((i) => i.sudah_kirim_wa).length,
         kanan: umkmList.filter((i) => i.zona === "KANAN").length,
         kiri: umkmList.filter((i) => i.zona === "KIRI").length,
+    };
+
+    // Spintax parser - randomly selects one option from {option1|option2|option3}
+    const parseSpintax = (text: string): string => {
+        const regex = /\{([^{}]+)\}/g;
+        return text.replace(regex, (match, group) => {
+            const options = group.split('|');
+            return options[Math.floor(Math.random() * options.length)];
+        });
+    };
+
+    // WhatsApp promotional messages with FULL SPINTAX
+    // Format: {opsi1|opsi2|opsi3} akan dipilih random
+    // {nama} = nama UMKM (bukan nama pemilik)
+    const PROMO_MESSAGES = [
+        // Style 1: Profesional - Langsung Menyebut Usaha
+        {
+            id: 1,
+            name: "Profesional",
+            message: `{Halo|Selamat siang|Permisi} Kak{,|!} {🙏|👋}
+
+{Mohon maaf|Maaf} {mengganggu|ganggu sebentar}, {apakah ini|ini} dengan {pemilik|yang punya} *{nama}* {ya Kak|Kak}? {🏪|🍽️}
+
+{Saya|Kami} {dapat|dapet} {nomor|kontak} {Kakak|ini} dari tim Rayo Kurir {saat|waktu} {tebar brosur|sebar brosur} {kemarin|beberapa hari lalu} {📋|📄}
+
+{Perkenalkan|Saya} dari *Rayo Kurir* yang {sudah|udah} {berjalan|beroperasi} *10 hari* di {sekitar sini|wilayah ini} {🛵|🏍️}
+
+Kami {mau|ingin} {menawarkan|kasih} *PROMOSI GRATIS* {untuk|buat} usaha {Kakak|Kak}:
+{📱|📲} Kami {promosikan|tampilkan} di *Story WA* & *Instagram* Rayo Kurir
+{📋|📝} {Menu|Produk} *{nama}* masuk di *Katalog WhatsApp* kami
+
+{Tertarik|Mau|Berminat} Kak? {Boleh|Bisa} {kirimkan|share} {foto menu|daftar menu|katalog}nya {🙏|ya Kak} 📸
+
+_{Gratis|FREE} tanpa biaya {apapun|sama sekali}!_ {✨|💫}`
+        },
+        // Style 2: Friendly - Santai & Akrab
+        {
+            id: 2,
+            name: "Friendly",
+            message: `{Hai|Halo|Hi} Kak{!|~} {👋|🙌}
+
+{Btw|Eh}, ini bener sama *{nama}* {kan|ya} Kak? {🏪|🍜|🍔}
+
+{Oh iya|Btw}, {saya|aku} dapet {nomor|kontaknya} dari {tim|temen} Rayo Kurir yang {tebar|sebar} brosur {kemarin|beberapa hari lalu} {nih|lho} {📋|😊}
+
+{Saya|Aku} dari *Rayo Kurir* {nih|ya}~ {🛵|🏍️} Udah jalan *10 hari* dan {alhamdulillah|syukurlah} {rame|lancar} {lho|nih}! {🎉|✨}
+
+{Nah|Jadi} {gini|begini} Kak, {mau nawarin|ada penawaran} {menarik|bagus}:
+{✨|🌟} *{nama}* bisa {kita|kami} *promosiin GRATIS* di Story WA & {Instagram|IG}!
+{📸|📷} {Menu|Katalog}nya masuk *Katalog WA* Rayo Kurir biar makin {dikenal|viral|terkenal}~
+
+{Mau gak Kak|Gimana Kak|Tertarik}? {Tinggal|Cukup} kirim {aja |}{foto menunya|katalognya} {😊🙏|🙏✨}`
+        },
+        // Style 3: Singkat - To The Point
+        {
+            id: 3,
+            name: "Singkat",
+            message: `{Assalamualaikum|Halo|Permisi} Kak {🙏|👋}
+
+Ini dengan *{nama}* {ya|kan} Kak?
+
+{Dapat|Dapet} {nomor|kontak} dari tim Rayo Kurir {saat|waktu} tebar brosur {📋|📄}
+
+{Saya|Kami} dari *Rayo Kurir* (10 hari {beroperasi|jalan}) {🛵|🏍️}
+
+{Mau|Ingin} bantu *promosiin GRATIS* {usaha Kakak|*{nama}*}:
+{•|→} Story WA & {Instagram|IG}
+{•|→} Katalog {WhatsApp|WA} Rayo Kurir
+
+Kirim {aja |}{foto menu|katalog}nya Kak! {📸|🖼️}
+
+_100% Gratis!_ {✨|⭐}`
+        },
+        // Style 4: Energik - Semangat & Menarik Perhatian
+        {
+            id: 4,
+            name: "Energik",
+            message: `{Halooo|Haiii|Heyy} Kak{!!|!} {🔥|⚡|💥}
+
+Wah, ini *{nama}* yang {terkenal|hits|enak} itu {kan|ya} Kak? {🤩|😍|🏪}
+
+{Saya|Aku} {dapat|dapet} {nomornya|kontaknya} dari tim Rayo Kurir {waktu|pas} {tebar|sebar} brosur {lho|nih} {📋|😁}
+
+*{KABAR BAIK|BERITA BAGUS|INFO MENARIK}* {nih|Kak}! 🎉
+
+*Rayo Kurir* (udah 10 hari jalan {🛵|🏍️}) mau {bantu|ajak} *{nama}* {buat|untuk}:
+{🌟|⭐} *PROMO GRATIS* di Story WA + {Instagram|IG} kami!
+{📱|📲} Masuk *Katalog WA* Rayo Kurir biar makin {viral|terkenal|laris}!
+
+{Gas|Yuk|Langsung} Kak, kirim {foto menunya|katalognya}! {Kita|Kami} {promosiin|viralkan} *{nama}* {SEKARANG|SEGERA}! {💪🚀|🔥✨}
+
+_Gratis Kak, {serius|beneran}!_ {🤝|✨}`
+        },
+        // Style 5: Sopan - Humble & Menghargai
+        {
+            id: 5,
+            name: "Sopan",
+            message: `{Assalamualaikum|Selamat siang} Kak, {mohon maaf mengganggu|maaf ganggu sebentar} {🙏|🙏🏻}
+
+{Apakah benar|Benar ya Kak} ini dengan {pemilik|pengelola} *{nama}*? {🏪|🍽️}
+
+{Sebelumnya|Mohon maaf}, {saya|kami} {mendapat|dapat} {nomor|kontak} {Kakak|ini} dari tim Rayo Kurir {saat|sewaktu} {menyebar|tebar} brosur {beberapa waktu lalu|kemarin} {📋|📄}
+
+{Perkenalkan|Izin memperkenalkan}, {saya|kami} dari *Rayo Kurir* yang {sudah|telah} *10 hari* {melayani|beroperasi} di {sekitar sini|wilayah ini} {🛵|🏍️}
+
+{Jika|Apabila} {berkenan|Kakak tidak keberatan}, kami {ingin|bermaksud} membantu *{mempromosikan|promosikan}* *{nama}* secara *GRATIS*:
+{•|▪️} Story {WhatsApp|WA} & Instagram kami
+{•|▪️} Katalog {WhatsApp|WA} Rayo Kurir
+
+{Apabila|Jika} {tertarik|berminat}, {boleh|bisa} dikirimkan {foto menu|daftar menu|katalog}nya {📸|📷}
+
+{Terima kasih banyak|Terimakasih|Hatur nuhun} Kak {🙏✨|🙏🏻✨}`
+        }
+    ];
+
+    const [selectedMessageId, setSelectedMessageId] = useState(1);
+    const selectedMessage = PROMO_MESSAGES.find(m => m.id === selectedMessageId) || PROMO_MESSAGES[0];
+
+    // Generate WhatsApp link with spintax parsing and personalized name
+    const generateWaLink = (phone: string, namaUmkm: string) => {
+        const cleanPhone = phone.replace(/^0/, '62').replace(/[^0-9]/g, '');
+        // First replace {nama} with actual name, then parse remaining spintax
+        const withName = selectedMessage.message.replace(/{nama}/g, namaUmkm);
+        const personalizedMessage = parseSpintax(withName);
+        return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(personalizedMessage)}`;
+    };
+
+    // Export data as CSV
+    const handleExportCSV = () => {
+        const dataWithWa = umkmList.filter(item => item.wa && item.wa.trim() !== "");
+
+        if (dataWithWa.length === 0) {
+            toast.error("Tidak ada UMKM dengan nomor WA yang tersimpan");
+            return;
+        }
+
+        const csvRows = [
+            ["No", "Nama UMKM", "Zona", "Nomor WA", "Link WA Promo"].join(",")
+        ];
+
+        dataWithWa.forEach((item, index) => {
+            const waLink = generateWaLink(item.wa, item.nama);
+            csvRows.push([
+                index + 1,
+                `"${item.nama.replace(/"/g, '""')}"`,
+                item.zona === "KANAN" ? "Kanan Jalan" : "Kiri Jalan",
+                item.wa,
+                waLink
+            ].join(","));
+        });
+
+        const csvContent = csvRows.join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `rekapan-umkm-wa-${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+        toast.success(`${dataWithWa.length} kontak UMKM berhasil diexport!`);
+    };
+
+    // Export as HTML for better viewing
+    const handleExportHTML = () => {
+        const dataWithWa = umkmList.filter(item => item.wa && item.wa.trim() !== "");
+
+        if (dataWithWa.length === 0) {
+            toast.error("Tidak ada UMKM dengan nomor WA yang tersimpan");
+            return;
+        }
+
+        const htmlContent = `
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rekapan UMKM - Rayo Kurir</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { color: #1e40af; margin-bottom: 10px; }
+        .subtitle { color: #666; margin-bottom: 20px; }
+        .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 16px; }
+        .number { background: #1e40af; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }
+        .info { flex: 1; }
+        .name { font-weight: 600; color: #333; margin-bottom: 4px; }
+        .phone { color: #16a34a; font-size: 14px; }
+        .zona { font-size: 12px; color: #666; }
+        .wa-btn { background: #25D366; color: white; padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+        .wa-btn:hover { background: #128C7E; }
+        @media (max-width: 600px) { .card { flex-wrap: wrap; } .wa-btn { width: 100%; justify-content: center; margin-top: 12px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Rekapan UMKM - Rayo Kurir</h1>
+        <p class="subtitle">Total ${dataWithWa.length} kontak dengan nomor WA • Diexport ${new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })}</p>
+        
+        ${dataWithWa.map((item, index) => `
+        <div class="card">
+            <div class="number">${index + 1}</div>
+            <div class="info">
+                <div class="name">${item.nama}</div>
+                <div class="phone">📱 ${item.wa}</div>
+                <div class="zona">${item.zona === "KANAN" ? "🔵 Kanan Jalan" : "🟢 Kiri Jalan"}</div>
+            </div>
+            <a href="${generateWaLink(item.wa, item.nama)}" class="wa-btn" target="_blank">💬 Kirim Pesan</a>
+        </div>
+        `).join('')}
+    </div>
+</body>
+</html>
+        `.trim();
+
+        const blob = new Blob([htmlContent], { type: "text/html;charset=utf-8;" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `rekapan-umkm-wa-${new Date().toISOString().slice(0, 10)}.html`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+        toast.success(`${dataWithWa.length} kontak UMKM berhasil diexport ke HTML!`);
     };
 
     // Check if filtering is active
@@ -593,10 +839,91 @@ export default function RekapanPage() {
                                 Rayo UMKM Tracker
                             </h1>
                             <p className="text-xs text-muted-foreground">
-                                {stats.total} Total • {stats.brosur} Brosur • {stats.mitra} Mitra
+                                {stats.total} Total • {stats.hasWa} Punya WA • {stats.sudahKirimWa} Kirim WA • {stats.brosur} Brosur • {stats.mitra} Mitra
                             </p>
                         </div>
                         <div className="flex gap-2 items-center">
+                            {/* Export Buttons */}
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-9 w-9 rounded-full bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40"
+                                        title="Download Rekapan WA"
+                                    >
+                                        <Download className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+                                    <DialogHeader>
+                                        <DialogTitle className="flex items-center gap-2">
+                                            <Download className="h-5 w-5 text-green-600" />
+                                            Download Rekapan WA
+                                        </DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4">
+                                        <div className="text-sm text-muted-foreground">
+                                            Download daftar UMKM dengan nomor WA ({stats.hasWa} kontak) beserta link WhatsApp untuk promosi Rayo Kurir.
+                                        </div>
+
+                                        {/* Style Selector */}
+                                        <div>
+                                            <label className="text-sm font-medium mb-2 block">🎨 Pilih Style Copywriting:</label>
+                                            <div className="flex flex-wrap gap-2">
+                                                {PROMO_MESSAGES.map((msg) => (
+                                                    <button
+                                                        key={msg.id}
+                                                        onClick={() => setSelectedMessageId(msg.id)}
+                                                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${selectedMessageId === msg.id
+                                                            ? "bg-green-600 text-white shadow-md"
+                                                            : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                                                            }`}
+                                                    >
+                                                        {msg.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Preview */}
+                                        <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg text-sm border border-green-200 dark:border-green-800">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <p className="font-medium text-green-700 dark:text-green-400 flex items-center gap-2">
+                                                    📝 Preview ({selectedMessage.name}):
+                                                </p>
+                                                <button
+                                                    onClick={() => setPreviewKey(prev => prev + 1)}
+                                                    className="text-[10px] px-2 py-1 rounded bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-700 flex items-center gap-1"
+                                                    title="Generate variasi baru"
+                                                >
+                                                    🔄 Acak Ulang
+                                                </button>
+                                            </div>
+                                            <p className="text-[10px] text-green-600/70 dark:text-green-400/70 mb-2 italic">
+                                                *Setiap kontak dapat pesan BERBEDA (nama + variasi random)
+                                            </p>
+                                            <pre className="text-green-600 dark:text-green-300 text-xs whitespace-pre-wrap font-sans leading-relaxed max-h-48 overflow-y-auto">
+                                                {parseSpintax(selectedMessage.message.replace(/{nama}/g, "Seblak Jeng Frisca"))}
+                                            </pre>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <Button onClick={handleExportHTML} className="flex items-center gap-2 bg-green-600 hover:bg-green-700">
+                                                <MessageCircle className="h-4 w-4" />
+                                                HTML (Rapi)
+                                            </Button>
+                                            <Button onClick={handleExportCSV} variant="outline" className="flex items-center gap-2">
+                                                <FileText className="h-4 w-4" />
+                                                CSV (Excel)
+                                            </Button>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground text-center">
+                                            File HTML lebih rapi dan bisa langsung diklik untuk kirim WA
+                                        </p>
+                                    </div>
+                                </DialogContent>
+                            </Dialog>
                             <Button
                                 variant="ghost"
                                 size="icon"
@@ -659,6 +986,10 @@ export default function RekapanPage() {
                             <span className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.mitra}</span>
                             <span className="text-[10px] font-medium text-green-600/70 dark:text-green-400/70 uppercase">Mitra</span>
                         </div>
+                        <div className="flex-none bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 rounded-xl p-2.5 min-w-[100px] flex flex-col items-center justify-center">
+                            <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.hasWa}</span>
+                            <span className="text-[10px] font-medium text-emerald-600/70 dark:text-emerald-400/70 uppercase">Punya WA</span>
+                        </div>
                         <div className="flex-none bg-gray-50 dark:bg-gray-800/20 border border-gray-100 dark:border-gray-800 rounded-xl p-2.5 min-w-[100px] flex flex-col items-center justify-center">
                             <span className="text-2xl font-bold text-gray-700 dark:text-gray-300">
                                 {Math.round((stats.mitra / (stats.total || 1)) * 100)}%
@@ -707,9 +1038,12 @@ export default function RekapanPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="ALL">Semua Status</SelectItem>
-                                    <SelectItem value="BROSUR">✅ Brosur</SelectItem>
+                                    <SelectItem value="PUNYA_WA">📱 Punya WA</SelectItem>
+                                    <SelectItem value="BELUM_WA">📨 Belum Kirim WA</SelectItem>
+                                    <SelectItem value="SUDAH_WA">✅ Sudah Kirim WA</SelectItem>
+                                    <SelectItem value="BROSUR">📄 Sudah Brosur</SelectItem>
                                     <SelectItem value="MITRA">🎉 Mitra</SelectItem>
-                                    <SelectItem value="BELUM">⏳ Menunggu</SelectItem>
+                                    <SelectItem value="BELUM">⏳ Belum Progress</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

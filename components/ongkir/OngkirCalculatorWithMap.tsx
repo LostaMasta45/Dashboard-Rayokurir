@@ -322,29 +322,59 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
         }, 800)
     }
 
+    // Open Selection Mode with History State
     const openSelectionMode = (mode: "pickup" | "dropoff") => {
         setSelectingMode(mode)
+        // Push state so back button closes modal instead of navigating away
+        if (typeof window !== "undefined") {
+            window.history.pushState({ modal: 'map' }, '', window.location.href)
+        }
+
         // Set initial temp location to current pickup/dropoff or center or Basecamp
         const currentLoc = mode === "pickup" ? pickup : dropoff
 
         if (currentLoc) {
             setTempLocation(currentLoc)
         } else {
-            // If no location set, try to default to the other one, or basecamp
+            // Need to set a default location if none exists
+            // Ideally: User's geolocation or Basecamp or the other point
             const otherLoc = mode === "pickup" ? dropoff : pickup
             setTempLocation(otherLoc || { ...BASECAMP, id: 'basecamp' })
         }
     }
+
+    // Handle Back Button (Popstate)
+    useEffect(() => {
+        const handlePopState = (event: PopStateEvent) => {
+            // If we are in selecting mode, close it
+            setSelectingMode(null)
+        }
+
+        window.addEventListener('popstate', handlePopState)
+        return () => window.removeEventListener('popstate', handlePopState)
+    }, [])
 
     const confirmSelection = () => {
         if (!selectingMode || !tempLocation) return
 
         if (selectingMode === "pickup") {
             setPickup({ ...tempLocation, id: `picked-pickup-${Date.now()}` })
+            // Auto-advance logic: If no dropoff set, go to dropoff
+            if (!dropoff) {
+                // Small delay for UI transition
+                setTimeout(() => {
+                    openSelectionMode("dropoff")
+                }, 100)
+                // Don't close immediately, let the transition happen via openSelectionMode
+            } else {
+                setSelectingMode(null)
+                window.history.back() // Clean up history state
+            }
         } else {
             setDropoff({ ...tempLocation, id: `picked-dropoff-${Date.now()}` })
+            setSelectingMode(null)
+            window.history.back() // Clean up history state
         }
-        setSelectingMode(null)
         setTempLocation(null)
     }
 
@@ -764,7 +794,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                                 <Button
                                     variant="secondary"
                                     size="icon"
-                                    onClick={() => setSelectingMode(null)}
+                                    onClick={() => window.history.back()}
                                     className="rounded-full bg-white/80 backdrop-blur shadow-sm h-12 w-12 border border-gray-100 shrink-0"
                                 >
                                     <ArrowLeft size={20} className="text-gray-800" />
