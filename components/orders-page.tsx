@@ -20,12 +20,15 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Search, Trash2, CheckCircle, Clock, Zap, Package, LayoutList, Columns3, LayoutGrid, Filter, ChevronUp, ChevronDown, Eye, MoreHorizontal } from "lucide-react";
+import { Plus, Search, Trash2, CheckCircle, Clock, Zap, Package, LayoutList, Columns3, LayoutGrid, Filter, ChevronUp, ChevronDown, Eye, MoreHorizontal, CalendarDays, FileSpreadsheet, Pencil } from "lucide-react";
 import { AddOrderModal } from "@/components/add-order-modal";
 import { AssignCourierModal } from "@/components/assign-courier-modal";
 import { OrderDetailModal } from "@/components/order-detail-modal";
 import { KanbanBoard } from "@/components/kanban-board";
 import { MobileOrderCard } from "@/components/mobile-order-card";
+import { OrdersCalendar } from "@/components/orders-calendar";
+import { BulkOrderEntry } from "@/components/bulk-order-entry";
+import { EditOrderModal } from "@/components/edit-order-modal";
 import { toast } from "sonner";
 import {
     getOrders,
@@ -53,9 +56,11 @@ export function OrdersPage() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-    const [viewMode, setViewMode] = useState<"table" | "kanban" | "cards">("table");
+    const [viewMode, setViewMode] = useState<"table" | "kanban" | "cards" | "calendar" | "quickentry">("table");
     const [isFiltersOpen, setIsFiltersOpen] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editOrder, setEditOrder] = useState<Order | null>(null);
 
     // Filters
     const [statusFilter, setStatusFilter] = useState("ALL");
@@ -303,6 +308,11 @@ export function OrdersPage() {
         }
     };
 
+    const handleEditOrder = (order: Order) => {
+        setEditOrder(order);
+        setShowEditModal(true);
+    };
+
     const handleMarkTalanganReimbursed = async (orderId: string) => {
         if (confirm("Tandai talangan sebagai sudah diganti?")) {
             const success = await markTalanganReimbursed(orderId);
@@ -492,7 +502,7 @@ export function OrdersPage() {
             </div>
 
             {/* View Toggle */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm text-muted-foreground mr-2 hidden sm:inline">View:</span>
                 <div className="flex rounded-lg border overflow-hidden">
                     <Button
@@ -521,6 +531,24 @@ export function OrdersPage() {
                     >
                         <Columns3 className="h-4 w-4" />
                         <span className="hidden sm:inline">Kanban</span>
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`rounded-none px-2 sm:px-3 gap-1 sm:gap-1.5 ${viewMode === 'calendar' ? 'bg-rayo-primary text-white hover:bg-rayo-dark' : ''}`}
+                        onClick={() => setViewMode('calendar')}
+                    >
+                        <CalendarDays className="h-4 w-4" />
+                        <span className="hidden sm:inline">Kalender</span>
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`rounded-none px-2 sm:px-3 gap-1 sm:gap-1.5 ${viewMode === 'quickentry' ? 'bg-orange-500 text-white hover:bg-orange-600' : ''}`}
+                        onClick={() => setViewMode('quickentry')}
+                    >
+                        <FileSpreadsheet className="h-4 w-4" />
+                        <span className="hidden sm:inline">Quick Entry</span>
                     </Button>
                 </div>
             </div>
@@ -735,6 +763,22 @@ export function OrdersPage() {
                     couriers={couriers}
                     onOrderUpdated={loadData}
                 />
+            ) : viewMode === 'calendar' ? (
+                <OrdersCalendar
+                    orders={orders}
+                    onDayClick={(date, dayOrders) => {
+                        // Could open a modal with day details in the future
+                        if (dayOrders.length > 0) {
+                            toast.info(`${dayOrders.length} order pada ${date.toLocaleDateString('id-ID')}`);
+                        }
+                    }}
+                    onAddOrder={(date) => {
+                        // Could pre-fill date in add modal in the future
+                        setShowAddModal(true);
+                    }}
+                />
+            ) : viewMode === 'quickentry' ? (
+                <BulkOrderEntry onOrdersAdded={loadData} />
             ) : viewMode === 'cards' ? (
                 <div className="space-y-2">
                     <div className="flex items-center justify-between mb-4">
@@ -752,6 +796,7 @@ export function OrdersPage() {
                                 couriers={couriers}
                                 orderCounts={getCourierOrderCounts()}
                                 onDeleted={loadData}
+                                onEdit={handleEditOrder}
                             />
                         ))
                     )}
@@ -898,6 +943,12 @@ export function OrdersPage() {
                                                             )}
                                                             <DropdownMenuSeparator />
                                                             <DropdownMenuItem
+                                                                onClick={() => handleEditOrder(order)}
+                                                                className="text-blue-600 focus:text-blue-600"
+                                                            >
+                                                                <Pencil className="mr-2 h-4 w-4" /> Edit Order
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
                                                                 onClick={async () => {
                                                                     if (!confirm(`Hapus order #${order.id.slice(-6)}?`)) return;
                                                                     const success = await deleteOrder(order.id);
@@ -950,6 +1001,22 @@ export function OrdersPage() {
                 couriers={couriers}
                 open={showDetailModal}
                 onClose={() => setShowDetailModal(false)}
+                onEdit={handleEditOrder}
+                onDelete={async (orderId) => {
+                    await supabase.from("orders").delete().eq("id", orderId);
+                    await loadData();
+                    toast.success("Order berhasil dihapus");
+                }}
+            />
+
+            <EditOrderModal
+                isOpen={showEditModal}
+                onClose={() => {
+                    setShowEditModal(false);
+                    setEditOrder(null);
+                }}
+                onOrderUpdated={loadData}
+                order={editOrder}
             />
         </div>
     );

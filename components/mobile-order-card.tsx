@@ -17,6 +17,7 @@ import {
     ChevronDown,
     ChevronUp,
     Trash2,
+    Pencil,
 } from "lucide-react";
 
 interface MobileOrderCardProps {
@@ -24,6 +25,7 @@ interface MobileOrderCardProps {
     couriers: Courier[];
     orderCounts: Record<string, number>;
     onDeleted: () => void;
+    onEdit?: (order: Order) => void;
     onStatusChange?: () => void;
 }
 
@@ -40,6 +42,7 @@ export function MobileOrderCard({
     couriers,
     orderCounts,
     onDeleted,
+    onEdit,
 }: MobileOrderCardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -260,15 +263,27 @@ export function MobileOrderCard({
                         ) : (
                             <span className="text-sm text-muted-foreground">Belum di-assign</span>
                         )}
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={handleDelete}
-                            disabled={isDeleting}
-                            className="h-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                            {onEdit && (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => onEdit(order)}
+                                    className="h-8 text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                                >
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
+                            )}
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={handleDelete}
+                                disabled={isDeleting}
+                                className="h-8 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

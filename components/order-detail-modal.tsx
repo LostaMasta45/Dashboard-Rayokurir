@@ -19,7 +19,9 @@ import {
     Calendar,
     StickyNote,
     Truck,
-    Camera
+    Camera,
+    Pencil,
+    Trash2
 } from "lucide-react";
 import { formatCurrency, type Order, type Courier } from "@/lib/auth";
 
@@ -28,6 +30,8 @@ interface OrderDetailModalProps {
     couriers: Courier[];
     open: boolean;
     onClose: () => void;
+    onEdit?: (order: Order) => void;
+    onDelete?: (orderId: string) => void;
 }
 
 export function OrderDetailModal({
@@ -35,6 +39,8 @@ export function OrderDetailModal({
     couriers,
     open,
     onClose,
+    onEdit,
+    onDelete,
 }: OrderDetailModalProps) {
     if (!order) return null;
 
@@ -254,8 +260,40 @@ export function OrderDetailModal({
                     )}
                 </div>
 
-                <div className="flex justify-end pt-2">
-                    <Button variant="outline" onClick={onClose}>Tutup</Button>
+                <div className="flex justify-between gap-2 pt-2">
+                    <div className="flex gap-2">
+                        {onDelete && (
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => {
+                                    if (confirm('Yakin ingin menghapus order ini?')) {
+                                        onDelete(order.id);
+                                        onClose();
+                                    }
+                                }}
+                            >
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Hapus
+                            </Button>
+                        )}
+                    </div>
+                    <div className="flex gap-2">
+                        {onEdit && (
+                            <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => {
+                                    onEdit(order);
+                                    onClose();
+                                }}
+                            >
+                                <Pencil className="h-4 w-4 mr-1" />
+                                Edit
+                            </Button>
+                        )}
+                        <Button variant="outline" size="sm" onClick={onClose}>Tutup</Button>
+                    </div>
                 </div>
             </DialogContent>
         </Dialog>

@@ -24,6 +24,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
     getOrders,
     saveOrder,
@@ -36,7 +38,10 @@ import {
     SERVICE_TYPE_PRICING,
 } from "@/lib/auth";
 import { toast } from "sonner";
-import { Zap, FileText, UserPlus, User, MapPin, Package, Wallet, Settings, AlertTriangle, ExternalLink } from "lucide-react";
+import { Zap, FileText, UserPlus, User, MapPin, Package, Wallet, Settings, AlertTriangle, ExternalLink, History, CalendarIcon, Camera, Loader2, X } from "lucide-react";
+import { format } from "date-fns";
+import { id as idLocale } from "date-fns/locale";
+import { supabase } from "@/lib/supabaseClient";
 
 interface AddOrderModalProps {
     isOpen: boolean;
@@ -97,6 +102,12 @@ export function AddOrderModal({
     const [isQuickMode, setIsQuickMode] = useState(true);
     const [couriers, setCouriers] = useState<Courier[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
+
+    // Historical entry mode
+    const [isHistoricalEntry, setIsHistoricalEntry] = useState(false);
+    const [historicalDate, setHistoricalDate] = useState<Date>(new Date());
+    const [historicalPodFiles, setHistoricalPodFiles] = useState<{ url: string; preview: string }[]>([]);
+    const [isUploadingPod, setIsUploadingPod] = useState(false);
 
     // Fetch couriers when modal opens
     useEffect(() => {
@@ -173,6 +184,73 @@ export function AddOrderModal({
         });
         setErrors({});
         setWarnings([]);
+        setIsHistoricalEntry(false);
+        setHistoricalDate(new Date());
+        setHistoricalPodFiles([]);
+    };
+
+    // Handle POD file upload for historical orders
+    const handlePodUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        setIsUploadingPod(true);
+        const newPods: { url: string; preview: string }[] = [];
+
+        try {
+            for (const file of Array.from(files)) {
+                if (!file.type.startsWith("image/")) {
+                    toast.error(`${file.name} bukan file gambar`);
+                    continue;
+                }
+
+                // Create preview
+                const preview = URL.createObjectURL(file);
+
+                // Upload to Supabase Storage
+                const fileExt = file.name.split(".").pop();
+                const fileName = `pod-historical/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+
+                const { error } = await supabase.storage
+                    .from("pod-images")
+                    .upload(fileName, file, {
+                        cacheControl: "3600",
+                        upsert: false,
+                    });
+
+                if (error) {
+                    console.error("Upload error:", error);
+                    toast.error(`Gagal upload ${file.name}`);
+                    continue;
+                }
+
+                // Get public URL
+                const { data: publicUrlData } = supabase.storage
+                    .from("pod-images")
+                    .getPublicUrl(fileName);
+
+                newPods.push({
+                    url: publicUrlData?.publicUrl || "",
+                    preview: preview,
+                });
+            }
+
+            if (newPods.length > 0) {
+                setHistoricalPodFiles((prev) => [...prev, ...newPods]);
+                toast.success(`${newPods.length} foto berhasil diupload`);
+            }
+        } catch (error) {
+            console.error("Error uploading POD:", error);
+            toast.error("Gagal mengupload foto");
+        } finally {
+            setIsUploadingPod(false);
+            // Reset input
+            e.target.value = "";
+        }
+    };
+
+    const removePod = (index: number) => {
+        setHistoricalPodFiles((prev) => prev.filter((_, i) => i !== index));
     };
 
     const validateForm = () => {
@@ -251,6 +329,12 @@ export function AddOrderModal({
             return;
         }
 
+        // For historical entry, kurir is required
+        if (isHistoricalEntry && (!formData.kurirId || formData.kurirId === "no-assign")) {
+            toast.error("Entry data lama wajib pilih kurir yang mengerjakan");
+            return;
+        }
+
         setIsSubmitting(true);
 
         try {
@@ -259,6 +343,9 @@ export function AddOrderModal({
             const ongkir = Number.parseFloat(formData.ongkir) || 0;
             const waitingFeeAmount = Number.parseFloat(formData.addonWaitingFeeAmount) || 0;
             const now = new Date();
+
+            // Use historical date or current date
+            const orderDate = isHistoricalEntry ? historicalDate : now;
 
             // Normalize WA before saving
             const normalizedWa = normalizeWhatsApp(formData.pengirimWa.trim());
@@ -274,10 +361,19 @@ export function AddOrderModal({
                 );
             }
 
+            const actualKurirId = (formData.kurirId && formData.kurirId !== "no-assign") ? formData.kurirId : null;
+
+            // Determine status and payment states based on entry mode
+            const orderStatus = isHistoricalEntry
+                ? "SELESAI" as const
+                : (actualKurirId ? "OFFERED" : "NEW") as Order["status"];
+
+            const isHistorical = isHistoricalEntry;
+
             const newOrder: Order = {
                 id: generateId(),
-                createdAt: now.toISOString(),
-                createdDate: now.toDateString(),
+                createdAt: orderDate.toISOString(),
+                createdDate: orderDate.toDateString(),
                 pengirim: {
                     nama: formData.pengirimNama.trim(),
                     wa: normalizedWa,
@@ -290,8 +386,8 @@ export function AddOrderModal({
                     alamat: formData.dropoffAlamat.trim(),
                     mapsLink: formData.dropoffMapsLink.trim() || undefined,
                 },
-                kurirId: (formData.kurirId && formData.kurirId !== "no-assign") ? formData.kurirId : null,
-                status: (formData.kurirId && formData.kurirId !== "no-assign") ? "OFFERED" : "NEW",
+                kurirId: actualKurirId,
+                status: orderStatus,
                 jenisOrder: formData.jenisOrder as
                     | "Antar Barang"
                     | "Jemput Barang"
@@ -310,38 +406,44 @@ export function AddOrderModal({
                 },
                 ongkir: ongkir,
                 danaTalangan: danaTalangan,
-                talanganDiganti: false,
+                talanganDiganti: isHistorical ? true : false,
                 bayarOngkir: formData.bayarOngkir as "NON_COD" | "COD",
-                talanganReimbursed: false,
+                talanganReimbursed: isHistorical ? true : false,
                 cod: {
                     nominal: codNominal,
                     isCOD: codNominal > 0,
-                    codPaid: false,
+                    codPaid: isHistorical ? true : false,
                 },
-                codSettled: false,
-                nonCodPaid:
-                    codNominal === 0 && formData.bayarOngkir === "NON_COD",
+                codSettled: isHistorical ? true : false,
+                nonCodPaid: isHistorical ? true : (codNominal === 0 && formData.bayarOngkir === "NON_COD"),
                 // Payment method tracking
                 ongkirPaymentMethod: formData.bayarOngkir === "COD"
                     ? formData.ongkirPaymentMethod as "CASH" | "QRIS" | "TRANSFER"
                     : undefined,
-                ongkirPaymentStatus: formData.bayarOngkir === "NON_COD" ? "PAID" : "PENDING",
+                ongkirPaymentStatus: isHistorical ? "PAID" : (formData.bayarOngkir === "NON_COD" ? "PAID" : "PENDING"),
                 notes: formData.notes.trim(),
-                podPhotos: [],
+                podPhotos: isHistorical ? historicalPodFiles.map(p => ({
+                    url: p.url,
+                    uploadedAt: now.toISOString(),
+                    uploadedBy: "admin"
+                })) : [],
                 auditLog: [{
-                    event: "ORDER_CREATED",
+                    event: isHistorical ? "ORDER_HISTORICAL_ENTRY" : "ORDER_CREATED",
                     at: now.toISOString(),
                     actorType: "ADMIN",
                     actorId: "admin",
-                    meta: { kurirAssigned: formData.kurirId && formData.kurirId !== "no-assign" }
+                    meta: {
+                        kurirAssigned: !!actualKurirId,
+                        isHistoricalEntry: isHistorical,
+                        originalDate: isHistorical ? orderDate.toISOString() : undefined
+                    }
                 }],
             };
 
             await saveOrder(newOrder);
 
-            // Push notification to courier's Telegram if assigned
-            const actualKurirId = (formData.kurirId && formData.kurirId !== "no-assign") ? formData.kurirId : null;
-            if (actualKurirId) {
+            // Only push notification for NON-historical orders
+            if (!isHistorical && actualKurirId) {
                 try {
                     const pushRes = await fetch('/api/telegram/kurir/push-order', {
                         method: 'POST',
@@ -358,10 +460,15 @@ export function AddOrderModal({
             }
 
             const courierName = actualKurirId ? couriers.find(c => c.id === actualKurirId)?.nama : null;
-            toast.success(courierName
-                ? `Order berhasil ditambahkan dan di-assign ke ${courierName}!`
-                : "Order berhasil ditambahkan!"
-            );
+
+            if (isHistorical) {
+                toast.success(`✅ Data historis ${format(orderDate, 'd MMM yyyy', { locale: idLocale })} berhasil disimpan!`);
+            } else {
+                toast.success(courierName
+                    ? `Order berhasil ditambahkan dan di-assign ke ${courierName}!`
+                    : "Order berhasil ditambahkan!"
+                );
+            }
             resetForm();
             onOrderAdded();
         } catch (error) {
@@ -609,6 +716,121 @@ export function AddOrderModal({
                     onSubmit={handleSubmit}
                     className="space-y-6"
                 >
+                    {/* ===== HISTORICAL ENTRY TOGGLE ===== */}
+                    <div className={`p-4 rounded-lg border-2 transition-colors ${isHistoricalEntry ? 'bg-purple-50 border-purple-300 dark:bg-purple-950/30 dark:border-purple-700' : 'bg-gray-50 border-gray-200 dark:bg-gray-800/50 dark:border-gray-700'}`}>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className={`p-2 rounded-lg ${isHistoricalEntry ? 'bg-purple-100 dark:bg-purple-900' : 'bg-gray-100 dark:bg-gray-700'}`}>
+                                    <History className={`h-5 w-5 ${isHistoricalEntry ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500'}`} />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <Label htmlFor="historical-mode" className="font-semibold cursor-pointer">
+                                            Entry Data Lama
+                                        </Label>
+                                        {isHistoricalEntry && (
+                                            <Badge className="bg-purple-600 text-white text-xs">
+                                                Mode Historis
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Untuk input orderan yang sudah selesai di lapangan
+                                    </p>
+                                </div>
+                            </div>
+                            <Switch
+                                id="historical-mode"
+                                checked={isHistoricalEntry}
+                                onCheckedChange={setIsHistoricalEntry}
+                                disabled={isSubmitting}
+                            />
+                        </div>
+
+                        {isHistoricalEntry && (
+                            <div className="mt-4 space-y-3">
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    <div className="flex-1">
+                                        <Label className="text-sm font-medium mb-2 block">📅 Tanggal Order</Label>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    className="w-full justify-start text-left font-normal h-10"
+                                                    disabled={isSubmitting}
+                                                >
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    {format(historicalDate, "EEEE, d MMMM yyyy", { locale: idLocale })}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0" align="start">
+                                                <Calendar
+                                                    mode="single"
+                                                    selected={historicalDate}
+                                                    onSelect={(date) => date && setHistoricalDate(date)}
+                                                    disabled={(date) => date > new Date()}
+                                                    initialFocus
+                                                />
+                                            </PopoverContent>
+                                        </Popover>
+                                    </div>
+                                </div>
+
+                                {/* POD Upload Section */}
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium">📷 Bukti Pengiriman (POD)</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {historicalPodFiles.map((pod, index) => (
+                                            <div key={index} className="relative group">
+                                                <img
+                                                    src={pod.url || pod.preview}
+                                                    alt={`POD ${index + 1}`}
+                                                    className="w-20 h-20 object-cover rounded-lg border"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removePod(index)}
+                                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <label
+                                            className={`w-20 h-20 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-teal-500 hover:bg-teal-50/50 dark:hover:bg-teal-900/20 transition-all ${isUploadingPod ? 'pointer-events-none opacity-50' : ''}`}
+                                        >
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                multiple
+                                                onChange={handlePodUpload}
+                                                className="hidden"
+                                                disabled={isUploadingPod}
+                                            />
+                                            {isUploadingPod ? (
+                                                <Loader2 className="h-6 w-6 text-teal-500 animate-spin" />
+                                            ) : (
+                                                <>
+                                                    <Camera className="h-5 w-5 text-gray-400" />
+                                                    <span className="text-xs text-gray-400 mt-1">Upload</span>
+                                                </>
+                                            )}
+                                        </label>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">Opsional. Upload bukti pengiriman jika ada.</p>
+                                </div>
+
+                                <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800">
+                                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                    <AlertDescription className="text-amber-800 dark:text-amber-300 text-sm">
+                                        <strong>Perhatian:</strong> Order akan langsung tercatat sebagai <strong>SELESAI</strong> tanpa
+                                        notifikasi ke Bot Telegram. Pastikan data sudah benar!
+                                    </AlertDescription>
+                                </Alert>
+                            </div>
+                        )}
+                    </div>
+
                     {/* ===== SECTION A: CUSTOMER ===== */}
                     <div className="space-y-4">
                         <SectionHeader icon={User} title="Customer" description="Data pengirim order" />
