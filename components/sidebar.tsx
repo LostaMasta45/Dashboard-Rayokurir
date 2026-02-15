@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Package, DollarSign, Users, LogOut, Menu, X, Database, BarChart3, Sun, Moon, Camera, Store } from "lucide-react"
+import { LayoutDashboard, Package, DollarSign, Users, LogOut, Menu, X, Database, BarChart3, Sun, Moon, Camera, Store, MessageCircle } from "lucide-react"
 import { useTheme } from "next-themes"
 import { NotificationCenter } from "@/components/notification-center"
 
@@ -27,6 +27,7 @@ export function Sidebar({ currentPage, onPageChange, onLogout, userRole }: Sideb
     { id: "database", label: "Database", icon: Database },
     { id: "reports", label: "Laporan", icon: BarChart3 },
     { id: "pod", label: "Bukti Pengiriman", icon: Camera },
+    { id: "kotak-anonim", label: "Kotak Anonim", icon: MessageCircle },
   ]
 
   const kurirMenuItems = [

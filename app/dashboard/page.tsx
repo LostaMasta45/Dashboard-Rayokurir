@@ -14,6 +14,7 @@ import { AdminMobileNav } from "@/components/admin-mobile-nav"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { MitraPage } from "@/components/mitra-page"
 import { PodGalleryPage } from "@/components/pod-gallery-page"
+import { KotakAnonimPage } from "@/components/kotak-anonim-page"
 import { getCurrentSession, logoutUser, type User } from "@/lib/auth"
 
 export default function Dashboard() {
@@ -82,6 +83,8 @@ export default function Dashboard() {
                 return <ReportsPage />
             case "pod":
                 return <PodGalleryPage />
+            case "kotak-anonim":
+                return <KotakAnonimPage />
             default:
                 return <AdminDashboard />
         }

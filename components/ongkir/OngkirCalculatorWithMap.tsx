@@ -786,36 +786,56 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: "100%" }}
                         transition={{ duration: 0.3, ease: "circOut" }}
-                        className="fixed inset-0 z-[9999] bg-white dark:bg-black flex flex-col"
+                        className="fixed inset-0 z-[9999] bg-white dark:bg-black flex flex-col overflow-hidden"
                     >
-                        {/* Header with Search */}
-                        <div className="absolute top-0 inset-x-0 z-[10000] p-4 flex flex-col gap-3 bg-gradient-to-b from-white via-white/95 to-transparent dark:from-black dark:via-black/95 pt-4 pb-8 pointer-events-none">
-                            <div className="flex items-center gap-3 pointer-events-auto">
-                                <Button
-                                    variant="secondary"
-                                    size="icon"
-                                    onClick={() => window.history.back()}
-                                    className="rounded-full bg-white/80 backdrop-blur shadow-sm h-12 w-12 border border-gray-100 shrink-0"
-                                >
-                                    <ArrowLeft size={20} className="text-gray-800" />
-                                </Button>
-                                {/* Search Input Overlay */}
-                                <div className="flex-1 shadow-lg rounded-2xl">
-                                    <LocationSearchInput
-                                        placeholder={selectingMode === 'pickup' ? "Cari lokasi jemput..." : "Cari lokasi tujuan..."}
-                                        icon={selectingMode || 'pickup'}
-                                        value=""
-                                        onSelect={(loc) => {
-                                            setFlyToLocation({ lat: loc.lat, lng: loc.lng })
-                                        }}
-                                        className="w-full"
-                                    />
+                        {/* Header */}
+                        <div className="absolute top-0 inset-x-0 z-[10000] pointer-events-none" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+                            <div className="px-4 pb-10 bg-gradient-to-b from-black/40 via-black/20 to-transparent">
+                                <div className="flex items-center gap-2.5 pointer-events-auto">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => window.history.back()}
+                                        className="rounded-full bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl h-11 w-11 shadow-lg shadow-black/10 border-0 shrink-0 hover:bg-white dark:hover:bg-gray-800"
+                                    >
+                                        <ArrowLeft size={18} className="text-gray-800 dark:text-white" />
+                                    </Button>
+                                    <div className="flex-1 shadow-lg shadow-black/10 rounded-xl overflow-hidden">
+                                        <LocationSearchInput
+                                            placeholder={selectingMode === 'pickup' ? "Cari lokasi jemput..." : "Cari lokasi tujuan..."}
+                                            icon={selectingMode || 'pickup'}
+                                            value=""
+                                            onSelect={(loc) => {
+                                                setFlyToLocation({ lat: loc.lat, lng: loc.lng })
+                                            }}
+                                            className="w-full"
+                                        />
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={handleGPS}
+                                        className="rounded-full bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl h-11 w-11 shadow-lg shadow-black/10 border-0 shrink-0 hover:bg-white dark:hover:bg-gray-800"
+                                    >
+                                        {isGeocoding ? <Loader2 size={18} className="animate-spin text-teal-600" /> : <Crosshair size={18} className="text-gray-800 dark:text-white" />}
+                                    </Button>
+                                </div>
+                                {/* Mode Pill */}
+                                <div className="flex justify-center mt-3 pointer-events-none">
+                                    <div className={cn(
+                                        "px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest shadow-lg backdrop-blur-xl",
+                                        selectingMode === 'pickup'
+                                            ? "bg-teal-500/90 text-white shadow-teal-500/20"
+                                            : "bg-orange-500/90 text-white shadow-orange-500/20"
+                                    )}>
+                                        {selectingMode === 'pickup' ? '📍 Pilih Titik Jemput' : '📍 Pilih Titik Antar'}
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Map */}
-                        <div className="flex-1 relative bg-slate-100" style={{ minHeight: 'calc(100vh)' }}>
+                        <div className="flex-1 relative bg-slate-100 min-h-0">
                             {/* Separate Map Instance for Selection Mode */}
                             {tempLocation && (
                                 <div className="absolute inset-0">
@@ -832,70 +852,47 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                                 </div>
                             )}
 
-                            {/* GPS FAB */}
-                            <div className="absolute bottom-48 right-4 z-[10000]">
-                                <Button
-                                    onClick={handleGPS}
-                                    className="h-14 w-14 rounded-full bg-white dark:bg-gray-800 text-gray-700 dark:text-white shadow-xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all border border-gray-100 dark:border-gray-700"
-                                >
-                                    {isGeocoding ? <Loader2 className="animate-spin" /> : <Crosshair size={24} />}
-                                </Button>
-                            </div>
+
                         </div>
 
-                        {/* Footer Card - Improved visuals */}
-                        <div className="bg-white dark:bg-gray-900 p-6 pb-8 rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-[10000] border-t border-gray-100 relative">
+                        {/* Footer Card */}
+                        <div className="bg-white dark:bg-gray-900 px-5 pt-12 -mt-6 rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] z-[10000] border-t border-gray-100 relative shrink-0" style={{ paddingBottom: 'max(2rem, calc(env(safe-area-inset-bottom) + 0.5rem))' }}>
                             {/* Drag Handle */}
-                            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-gray-200 rounded-full" />
+                            <div className="absolute top-3.5 left-1/2 -translate-x-1/2 w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full" />
 
-                            <div className="mb-4 mt-2">
-                                <p className="text-xs uppercase tracking-wider font-bold text-gray-400 mb-1 flex items-center gap-2">
-                                    {selectingMode === 'pickup' ? (
-                                        <span className="text-teal-500">Lokasi Jemput</span>
-                                    ) : (
-                                        <span className="text-orange-500">Lokasi Tujuan</span>
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className={cn(
+                                    "w-11 h-11 rounded-full flex items-center justify-center shrink-0 shadow-sm",
+                                    selectingMode === 'pickup' ? "bg-teal-500 text-white" : "bg-orange-500 text-white"
+                                )}>
+                                    <MapPin size={20} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 dark:text-gray-500 mb-0.5">
+                                        {selectingMode === 'pickup' ? 'Lokasi Jemput' : 'Lokasi Tujuan'}
+                                    </p>
+                                    <p className="font-bold text-gray-900 dark:text-white text-sm leading-tight truncate flex items-center gap-1.5">
+                                        {tempLocation?.label?.split(',')[0] || 'Geser peta...'}
+                                        {isGeocoding && <span className="inline-block w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse shrink-0" />}
+                                    </p>
+                                    {tempLocation?.label && tempLocation.label.includes(',') && (
+                                        <p className="text-xs text-gray-400 dark:text-gray-500 leading-snug truncate mt-0.5">
+                                            {tempLocation.label.split(',').slice(1).join(',').trim()}
+                                        </p>
                                     )}
-                                    <span className="w-1 h-1 rounded-full bg-gray-300"></span>
-                                    <span>Geser peta untuk sesuaikan</span>
-                                </p>
-                                <div className="flex items-start gap-3 mt-3">
-                                    <div className={cn(
-                                        "mt-1 w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-sm border border-gray-100",
-                                        selectingMode === 'pickup' ? "bg-teal-50 text-teal-600" : "bg-orange-50 text-orange-600"
-                                    )}>
-                                        <MapPin size={20} className="fill-current" />
-                                    </div>
-                                    <div className="flex-1">
-                                        {isGeocoding ? (
-                                            <div className="space-y-2">
-                                                <div className="h-5 w-3/4 bg-gray-100 animate-pulse rounded" />
-                                                <div className="h-4 w-1/2 bg-gray-100 animate-pulse rounded" />
-                                            </div>
-                                        ) : (
-                                            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                                <p className="font-bold text-gray-900 dark:text-white text-lg leading-tight mb-1 line-clamp-2">
-                                                    {tempLocation?.label?.split(',')[0]}
-                                                </p>
-                                                <p className="text-sm text-gray-500 leading-snug line-clamp-2">
-                                                    {tempLocation?.label}
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
                                 </div>
                             </div>
 
                             <Button
                                 onClick={confirmSelection}
-                                disabled={isGeocoding}
                                 className={cn(
-                                    "w-full h-14 rounded-2xl font-bold text-lg shadow-lg shadow-gray-200/50 hover:scale-[1.02] active:scale-[0.98] transition-all",
+                                    "w-full h-14 rounded-2xl font-bold text-base shadow-lg hover:scale-[1.01] active:scale-[0.98] transition-all",
                                     selectingMode === 'pickup'
                                         ? "bg-teal-600 hover:bg-teal-700 text-white shadow-teal-500/20"
                                         : "bg-orange-600 hover:bg-orange-700 text-white shadow-orange-500/20"
                                 )}
                             >
-                                {isGeocoding ? <Loader2 className="animate-spin mr-2" /> : <Check className="mr-2" strokeWidth={3} />}
+                                <Check className="mr-2" size={20} strokeWidth={3} />
                                 Pilih Lokasi Ini
                             </Button>
                         </div>

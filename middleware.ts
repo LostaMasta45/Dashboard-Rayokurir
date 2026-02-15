@@ -57,8 +57,8 @@ export async function middleware(request: NextRequest) {
     const { data: { session } } = await supabase.auth.getSession()
 
     // Protected routes logic
-    // Only protect /dashboard and its sub-paths
-    if (request.nextUrl.pathname.startsWith('/dashboard')) {
+    // Protect /dashboard and /anon/inbox
+    if (request.nextUrl.pathname.startsWith('/dashboard') || request.nextUrl.pathname.startsWith('/anon/inbox')) {
         if (!session) {
             const loginUrl = new URL('/login', request.url)
             loginUrl.searchParams.set('redirect', request.nextUrl.pathname)
@@ -66,9 +66,10 @@ export async function middleware(request: NextRequest) {
         }
     }
 
-    // Redirect to dashboard if logged in and visiting /login
+    // Redirect if logged in and visiting /login
     if (request.nextUrl.pathname === '/login' && session) {
-        return NextResponse.redirect(new URL('/dashboard', request.url))
+        const redirectTo = request.nextUrl.searchParams.get('redirect') || '/dashboard'
+        return NextResponse.redirect(new URL(redirectTo, request.url))
     }
 
     return response
@@ -77,6 +78,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
     matcher: [
         '/dashboard/:path*',
+        '/anon/inbox',
         '/login',
     ],
 }
