@@ -8,6 +8,16 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string
 // Here we use service role for simplicity in API routes, but we should verify the user's session
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
 
+// Sanitize slug: lowercase, only alphanumeric and dashes, no leading/trailing dashes
+function sanitizeSlug(input: string): string {
+    return input
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9-]/g, '-')  // replace invalid chars with dash
+        .replace(/-+/g, '-')           // collapse multiple dashes
+        .replace(/^-|-$/g, '')         // remove leading/trailing dashes
+}
+
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
@@ -51,8 +61,11 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
         }
 
-        // Generate a random short slug (5 chars)
-        const slug = Math.random().toString(36).substring(2, 7)
+        // Use custom slug if provided, otherwise generate random.
+        const customSlug = body.slug ? sanitizeSlug(body.slug) : null
+        const slug = customSlug && customSlug.length >= 2
+            ? customSlug
+            : Math.random().toString(36).substring(2, 7)
 
         const { data, error } = await supabaseAdmin
             .from('anon_topics')
@@ -67,6 +80,44 @@ export async function POST(request: Request) {
             .single()
 
         if (error) throw error
+
+        return NextResponse.json({ topic: data })
+    } catch (error: any) {
+        // Handle unique constraint violation
+        if (error.code === '23505' || error.message?.includes('duplicate')) {
+            return NextResponse.json({ error: "Slug sudah digunakan, coba yang lain." }, { status: 409 })
+        }
+        return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+}
+
+export async function PATCH(request: Request) {
+    try {
+        const body = await request.json()
+        const { id, slug } = body
+
+        if (!id || !slug) {
+            return NextResponse.json({ error: "Missing id or slug" }, { status: 400 })
+        }
+
+        const sanitized = sanitizeSlug(slug)
+        if (sanitized.length < 2) {
+            return NextResponse.json({ error: "Slug minimal 2 karakter" }, { status: 400 })
+        }
+
+        const { data, error } = await supabaseAdmin
+            .from('anon_topics')
+            .update({ slug: sanitized })
+            .eq('id', id)
+            .select()
+            .single()
+
+        if (error) {
+            if (error.code === '23505' || error.message?.includes('duplicate')) {
+                return NextResponse.json({ error: "Slug sudah digunakan, coba yang lain." }, { status: 409 })
+            }
+            throw error
+        }
 
         return NextResponse.json({ topic: data })
     } catch (error: any) {

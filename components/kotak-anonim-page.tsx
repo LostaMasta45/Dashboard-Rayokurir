@@ -5,7 +5,7 @@ import {
     Plus, Trash2, Copy, MessageCircle, ExternalLink, QrCode,
     MoreVertical, ArrowLeft, RefreshCw, CheckCircle2, Pin,
     Search, Filter, Sparkles, Send, MoveRight, Inbox, LayoutGrid,
-    Clock, MailOpen, Mail
+    Clock, MailOpen, Mail, Pencil, Link2
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { id as idLocale } from "date-fns/locale"
@@ -88,6 +88,16 @@ export function KotakAnonimPage() {
     const [loadingMessages, setLoadingMessages] = useState(false)
     const [filter, setFilter] = useState("all")
 
+    // Custom Slug State
+    const [customSlug, setCustomSlug] = useState("")
+
+    // Edit Slug State
+    const [editSlugOpen, setEditSlugOpen] = useState(false)
+    const [editSlugTopic, setEditSlugTopic] = useState<Topic | null>(null)
+    const [editSlugValue, setEditSlugValue] = useState("")
+    const [editSlugLoading, setEditSlugLoading] = useState(false)
+    const [editSlugError, setEditSlugError] = useState("")
+
     useEffect(() => {
         loadTopics()
     }, [])
@@ -134,20 +144,25 @@ export function KotakAnonimPage() {
                 body: JSON.stringify({
                     user_id: user.id,
                     title,
-                    question_text: question
+                    question_text: question,
+                    slug: customSlug || undefined
                 })
             })
 
-            if (!res.ok) throw new Error("Gagal membuat topik")
+            if (!res.ok) {
+                const err = await res.json()
+                throw new Error(err.error || "Gagal membuat topik")
+            }
 
             const { topic } = await res.json()
             setTopics([topic, ...topics])
             setIsCreateOpen(false)
             setTitle("")
             setQuestion("Ada masukan apa buat kita?")
+            setCustomSlug("")
             toast.success("Topik berhasil dibuat!")
-        } catch (error) {
-            toast.error("Gagal membuat topik")
+        } catch (error: any) {
+            toast.error(error.message || "Gagal membuat topik")
         } finally {
             setCreateLoading(false)
         }
@@ -169,6 +184,44 @@ export function KotakAnonimPage() {
         const url = `${window.location.origin}/q/${slug}`
         navigator.clipboard.writeText(url)
         toast.success("Link disalin!", { description: "Siap dibagikan ke WhatsApp." })
+    }
+
+    // --- Edit Slug ---
+
+    function openEditSlug(topic: Topic) {
+        setEditSlugTopic(topic)
+        setEditSlugValue(topic.slug)
+        setEditSlugError("")
+        setEditSlugOpen(true)
+    }
+
+    async function handleEditSlug() {
+        if (!editSlugTopic || !editSlugValue.trim()) return
+        setEditSlugLoading(true)
+        setEditSlugError("")
+
+        try {
+            const res = await fetch("/api/anon/topics", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: editSlugTopic.id, slug: editSlugValue.trim() })
+            })
+
+            if (!res.ok) {
+                const err = await res.json()
+                setEditSlugError(err.error || "Gagal mengubah link")
+                return
+            }
+
+            const { topic: updated } = await res.json()
+            setTopics(topics.map(t => t.id === updated.id ? { ...t, slug: updated.slug } : t))
+            setEditSlugOpen(false)
+            toast.success("Link berhasil diubah!")
+        } catch (error: any) {
+            setEditSlugError(error.message || "Gagal mengubah link")
+        } finally {
+            setEditSlugLoading(false)
+        }
     }
 
     function shareWA(slug: string, question: string) {
@@ -457,6 +510,32 @@ ${url}`
                                         className="h-10 rounded-lg border-slate-200 bg-slate-50 focus:bg-white transition-all font-medium"
                                     />
                                 </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-semibold uppercase text-slate-500 tracking-wider flex items-center gap-2">
+                                        Custom Link <span className="text-[10px] font-normal normal-case text-slate-400">(opsional)</span>
+                                    </Label>
+                                    <div className="relative">
+                                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono pointer-events-none">
+                                            /q/
+                                        </div>
+                                        <Input
+                                            placeholder="contoh: feedback-otr"
+                                            value={customSlug}
+                                            onChange={e => setCustomSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
+                                            className="h-10 rounded-lg border-slate-200 bg-slate-50 focus:bg-white transition-all font-mono text-sm pl-10"
+                                        />
+                                    </div>
+                                    {customSlug && (
+                                        <p className="text-[11px] text-teal-600 font-mono ml-1">
+                                            rayokurir.com/q/{customSlug.replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')}
+                                        </p>
+                                    )}
+                                    {!customSlug && (
+                                        <p className="text-[11px] text-slate-400 ml-1">
+                                            Kosongkan untuk link otomatis
+                                        </p>
+                                    )}
+                                </div>
                                 <DialogFooter className="pt-4">
                                     <Button type="submit" disabled={createLoading} className="w-full rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold h-11">
                                         {createLoading ? "Memproses..." : "Buat Topik"}
@@ -500,6 +579,7 @@ ${url}`
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="rounded-xl w-48 shadow-lg border-slate-100 dark:border-slate-800">
                                                     <DropdownMenuItem onClick={() => copyLink(topic.slug)} className="py-2.5 px-3 font-medium cursor-pointer"><Copy className="mr-2 h-4 w-4 text-slate-400" /> Salin Link</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => openEditSlug(topic)} className="py-2.5 px-3 font-medium cursor-pointer"><Pencil className="mr-2 h-4 w-4 text-slate-400" /> Edit Link</DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => shareWA(topic.slug, topic.question_text)} className="py-2.5 px-3 font-medium cursor-pointer"><ExternalLink className="mr-2 h-4 w-4 text-slate-400" /> Share WhatsApp</DropdownMenuItem>
                                                     <DropdownMenuSeparator className="my-1 bg-slate-100 dark:bg-slate-800" />
                                                     <DropdownMenuItem className="text-red-600 py-2.5 px-3 font-medium focus:bg-red-50 dark:focus:bg-red-900/20 cursor-pointer" onClick={() => handleDeleteTopic(topic.id)}><Trash2 className="mr-2 h-4 w-4" /> Hapus Topik</DropdownMenuItem>
@@ -539,6 +619,58 @@ ${url}`
                     </motion.div>
                 )}
             </motion.div>
+
+            {/* Edit Slug Dialog */}
+            <Dialog open={editSlugOpen} onOpenChange={setEditSlugOpen}>
+                <DialogContent className="sm:max-w-md rounded-2xl border-0 shadow-2xl p-0 overflow-hidden bg-white dark:bg-slate-900">
+                    <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 to-teal-500"></div>
+                    <DialogHeader className="p-6 pb-2">
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                            <Link2 className="w-5 h-5 text-teal-600" /> Edit Link
+                        </DialogTitle>
+                        <DialogDescription>
+                            Ubah link anonim untuk topik "{editSlugTopic?.title}"
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 px-6 pb-6">
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold uppercase text-slate-500 tracking-wider">Custom Slug</Label>
+                            <div className="relative">
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono pointer-events-none">
+                                    /q/
+                                </div>
+                                <Input
+                                    placeholder="contoh: otr"
+                                    value={editSlugValue}
+                                    onChange={e => { setEditSlugValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-')); setEditSlugError("") }}
+                                    className="h-10 rounded-lg border-slate-200 bg-slate-50 focus:bg-white transition-all font-mono text-sm pl-10"
+                                    autoFocus
+                                    onKeyDown={e => e.key === 'Enter' && handleEditSlug()}
+                                />
+                            </div>
+                            {editSlugValue && (
+                                <p className="text-[11px] text-teal-600 font-mono ml-1">
+                                    rayokurir.com/q/{editSlugValue.replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')}
+                                </p>
+                            )}
+                            {editSlugError && (
+                                <p className="text-[11px] text-red-500 font-medium ml-1">
+                                    ⚠️ {editSlugError}
+                                </p>
+                            )}
+                        </div>
+                        <DialogFooter className="pt-2">
+                            <Button
+                                onClick={handleEditSlug}
+                                disabled={editSlugLoading || !editSlugValue.trim() || editSlugValue.trim().length < 2}
+                                className="w-full rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold h-11"
+                            >
+                                {editSlugLoading ? "Menyimpan..." : "Simpan Link"}
+                            </Button>
+                        </DialogFooter>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </AnimatePresence>
     )
 }

@@ -19,6 +19,10 @@ interface LocationSearchInputProps {
     className?: string
     value?: string
     onClear?: () => void
+    showGPS?: boolean
+    showIndicator?: boolean
+    showIcon?: boolean
+    variant?: "default" | "minimal"
 }
 
 export function LocationSearchInput({
@@ -27,7 +31,11 @@ export function LocationSearchInput({
     icon = "pickup",
     className = "",
     value = "",
-    onClear
+    onClear,
+    showGPS = true,
+    showIndicator = true,
+    showIcon = true,
+    variant = "default"
 }: LocationSearchInputProps) {
     const [query, setQuery] = useState(value)
     const [isEditing, setIsEditing] = useState(false) // Track if user is actively editing
@@ -150,10 +158,12 @@ export function LocationSearchInput({
         <div ref={containerRef} className={cn("relative group", className)}>
             <div className="relative">
                 {/* Visual Indicator Line (Optional aesthetic) */}
-                <div className={cn(
-                    "absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full transition-colors",
-                    icon === "pickup" ? "bg-teal-500" : "bg-orange-500"
-                )} />
+                {showIndicator && (
+                    <div className={cn(
+                        "absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full transition-colors",
+                        icon === "pickup" ? "bg-teal-500" : "bg-orange-500"
+                    )} />
+                )}
 
                 {/* Input */}
                 <input
@@ -170,27 +180,31 @@ export function LocationSearchInput({
                     }}
                     placeholder={placeholder}
                     className={cn(
-                        "w-full h-14 pl-12 pr-24 rounded-2xl border-0 text-sm font-medium transition-all shadow-sm ring-1 ring-gray-200 dark:ring-gray-700 placeholder:font-normal placeholder:text-gray-400 dark:placeholder:text-gray-500/70 text-gray-900 dark:text-white",
-                        "focus:outline-none focus:ring-2 focus:shadow-md backdrop-blur-sm",
-                        icon === "pickup"
+                        "w-full h-14 pr-24 rounded-2xl border-0 text-sm font-medium transition-all text-gray-900 dark:text-white placeholder:font-normal placeholder:text-gray-400 dark:placeholder:text-gray-500/70",
+                        showIcon ? "pl-12" : "pl-4",
+                        variant === "default" && "shadow-sm ring-1 ring-gray-200 dark:ring-gray-700 focus:outline-none focus:ring-2 focus:shadow-md backdrop-blur-sm",
+                        variant === "default" && (icon === "pickup"
                             ? "bg-white dark:bg-black/20 focus:ring-teal-500/50 border border-gray-200 dark:border-gray-700/50"
-                            : "bg-white dark:bg-black/20 focus:ring-orange-500/50 border border-gray-200 dark:border-gray-700/50"
+                            : "bg-white dark:bg-black/20 focus:ring-orange-500/50 border border-gray-200 dark:border-gray-700/50"),
+                        variant === "minimal" && "bg-transparent h-full px-0 border-none ring-0 focus:ring-0 shadow-none outline-none"
                     )}
                 />
 
                 {/* Left Icon (Absolute) */}
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
-                    {isLoading ? (
-                        <Loader2 size={18} className="animate-spin text-gray-400" />
-                    ) : (
-                        <div className={cn(
-                            "p-1.5 rounded-full",
-                            icon === "pickup" ? "bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400" : "bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
-                        )}>
-                            <Search size={16} strokeWidth={2.5} />
-                        </div>
-                    )}
-                </div>
+                {showIcon && (
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                        {isLoading ? (
+                            <Loader2 size={18} className="animate-spin text-gray-400" />
+                        ) : (
+                            <div className={cn(
+                                "p-1.5 rounded-full",
+                                icon === "pickup" ? "bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400" : "bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
+                            )}>
+                                <Search size={16} strokeWidth={2.5} />
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Right buttons */}
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
@@ -205,27 +219,29 @@ export function LocationSearchInput({
                         </button>
                     )}
 
-                    <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-0.5" />
+                    {showGPS && <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-0.5" />}
 
                     {/* GPS button */}
-                    <button
-                        onClick={handleGetCurrentLocation}
-                        disabled={isGettingLocation}
-                        className={cn(
-                            "flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all",
-                            isGettingLocation
-                                ? "text-teal-500 bg-teal-50 dark:bg-teal-900/20"
-                                : "text-gray-500 dark:text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/20 bg-gray-50 dark:bg-gray-700/50"
-                        )}
-                        title="Gunakan lokasi saya"
-                    >
-                        {isGettingLocation ? (
-                            <Loader2 size={14} className="animate-spin" />
-                        ) : (
-                            <Navigation2 size={14} className="fill-current" />
-                        )}
-                        <span className="hidden sm:inline">Lokasi Saya</span>
-                    </button>
+                    {showGPS && (
+                        <button
+                            onClick={handleGetCurrentLocation}
+                            disabled={isGettingLocation}
+                            className={cn(
+                                "flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                                isGettingLocation
+                                    ? "text-teal-500 bg-teal-50 dark:bg-teal-900/20"
+                                    : "text-gray-500 dark:text-gray-400 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-900/20 bg-gray-50 dark:bg-gray-700/50"
+                            )}
+                            title="Gunakan lokasi saya"
+                        >
+                            {isGettingLocation ? (
+                                <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                                <Navigation2 size={14} className="fill-current" />
+                            )}
+                            <span className="hidden sm:inline">Lokasi Saya</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
