@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { getCurrentUser } from "@/lib/auth"
-import { Menu, X, CheckCircle, Package, Truck, DollarSign, MessageCircle, MapPin, Star, Clock, ShoppingBag, FileText, Utensils, ChevronDown, Zap, ShieldCheck, Store, Pill, ArrowRight } from "lucide-react"
+import { Menu, X, CheckCircle, Package, Truck, DollarSign, MessageCircle, MapPin, Star, Clock, ShoppingBag, FileText, Utensils, ChevronDown, Zap, ShieldCheck, Store, Pill, ArrowRight, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence, Variants } from "framer-motion"
 import { InfiniteMarquee, LiveNotification, TypewriterText } from "@/components/lp2"
@@ -17,7 +17,8 @@ export default function LandingPage() {
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
 
-  const WA_LINK = "https://wa.me/6281234567890?text=ORDER%20RAYO%0ANama%3A%0ANo%20WA%3A%0AJenis%20layanan%3A%0APickup%3A%0ADropoff%3A%0AItem%3A"
+  const WA_LINK = "https://wa.me/6289676111118?text=ORDER%20RAYO%0ANama%3A%0ANo%20WA%3A%0AJenis%20layanan%3A%0APickup%3A%0ADropoff%3A%0AItem%3A"
+  const WA_GROUP_LINK = "https://chat.whatsapp.com/GetD8e3AZcWF3TLoFuNMRg"
 
   useEffect(() => {
     const currentUser = getCurrentUser()
@@ -670,6 +671,74 @@ Catatan:`}
         </div>
       </section>
 
+      {/* Gabung Grup WA Section */}
+      <section className="py-20 bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-green-200/30 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-emerald-200/30 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            variants={fadeInUp}
+            className="text-center"
+          >
+            <div className="inline-flex items-center gap-2 bg-green-100 border border-green-200 px-4 py-2 rounded-full text-green-700 font-bold text-sm mb-6">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-ping"></span>
+              <span className="w-2 h-2 rounded-full bg-green-500 absolute"></span>
+              Komunitas Rayo Kurir
+            </div>
+
+            <h2 className="text-3xl md:text-4xl font-black text-gray-900 mb-4 tracking-tight">
+              Gabung Grup WA <span className="text-green-600">Rayo Kurir</span>
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto mb-8 leading-relaxed">
+              Dapatkan info terbaru, promo spesial, dan update layanan langsung di grup WhatsApp resmi Rayo Kurir. Jangan sampai ketinggalan!
+            </p>
+
+            <div className="bg-white rounded-3xl p-8 md:p-10 shadow-xl border border-green-100 max-w-xl mx-auto">
+              <div className="flex items-center justify-center gap-3 mb-6">
+                <div className="bg-green-500 rounded-full p-3">
+                  <Users size={28} className="text-white" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-bold text-gray-900 text-lg">Grup Info Rayo Kurir</h3>
+                  <p className="text-sm text-gray-500">Update terbaru & promo eksklusif</p>
+                </div>
+              </div>
+
+              <ul className="text-left space-y-3 mb-8">
+                {[
+                  "🔔 Info update layanan & area coverage terbaru",
+                  "💰 Promo ongkir & diskon spesial member grup",
+                  "📢 Pengumuman penting dari Rayo Kurir",
+                  "🤝 Tanya jawab langsung dengan admin",
+                ].map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 text-gray-700 text-sm">
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                <Button
+                  onClick={() => window.open(WA_GROUP_LINK)}
+                  className="w-full h-14 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-bold text-lg shadow-xl shadow-green-500/30 transition-all duration-300"
+                >
+                  <Users size={20} className="mr-2" />
+                  Gabung Grup WhatsApp Sekarang
+                </Button>
+              </motion.div>
+
+              <p className="text-xs text-gray-400 mt-4">
+                *Gratis, tanpa biaya. Grup khusus untuk info & update Rayo Kurir.
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section className="py-20 px-4 bg-gray-50">
         <div className="max-w-4xl mx-auto bg-gradient-to-br from-gray-900 to-black rounded-[3rem] p-10 md:p-16 text-center relative overflow-hidden shadow-2xl">
@@ -729,7 +798,7 @@ Catatan:`}
               <h4 className="font-bold text-lg mb-6 text-white">Kontak</h4>
               <ul className="space-y-4 text-gray-400">
                 <li className="flex gap-3 items-start"><MapPin className="h-5 w-5 text-rayo-primary mt-0.5" /> Basecamp Ds. Sumobito, Jombang</li>
-                <li className="flex gap-3 items-center"><MessageCircle className="h-5 w-5 text-rayo-primary" /> +62 8XX-XXXX-XXXX</li>
+                <li className="flex gap-3 items-center"><MessageCircle className="h-5 w-5 text-rayo-primary" /> <a href={WA_LINK} target="_blank" rel="noreferrer" className="hover:text-rayo-primary transition-colors">0896-7611-1118</a></li>
                 <li className="flex gap-3 items-center"><Clock className="h-5 w-5 text-rayo-primary" /> 07.00 - 21.00 WIB</li>
               </ul>
             </div>
@@ -740,6 +809,7 @@ Catatan:`}
                 <li><button onClick={() => scrollToSection("layanan")} className="hover:text-rayo-primary transition-colors">Layanan</button></li>
                 <li><button onClick={() => scrollToSection("tarif")} className="hover:text-rayo-primary transition-colors">Cek Tarif</button></li>
                 <li><button onClick={() => scrollToSection("cara-order")} className="hover:text-rayo-primary transition-colors">Cara Order</button></li>
+                <li><a href={WA_GROUP_LINK} target="_blank" rel="noreferrer" className="hover:text-green-400 transition-colors flex items-center gap-1"><Users size={14} /> Gabung Grup WA</a></li>
                 <li><Link href="/login" className="hover:text-rayo-primary transition-colors">Login Admin / Kurir</Link></li>
               </ul>
             </div>
