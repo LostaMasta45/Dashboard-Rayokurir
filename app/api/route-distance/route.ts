@@ -82,17 +82,14 @@ async function getOrsRoute(from: Coordinate, to: Coordinate, mode: RouteMode) {
 }
 
 export async function POST(request: NextRequest) {
-    let stage = "request-body"
     try {
         const body: RouteRequest = await request.json()
         const { from, to } = body
 
-        stage = "coordinate-validation"
         if (!isCoordinate(from) || !isCoordinate(to)) {
             return NextResponse.json({ error: "Invalid coordinates" }, { status: 400 })
         }
 
-        stage = "cache-key"
         const requestedMode = parseRouteMode(body.routeMode)
         const cacheKey = `${CACHE_VERSION}|${requestedMode}|${from.lat.toFixed(6)},${from.lng.toFixed(6)}|${to.lat.toFixed(6)},${to.lng.toFixed(6)}`
         const cached = cache.get(cacheKey)
@@ -100,7 +97,6 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(cached.data)
         }
 
-        stage = "ors-route"
         const requestedRoute = await getOrsRoute(from, to, requestedMode)
         let result: RouteResponse
 
@@ -145,11 +141,9 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        stage = "response-cache"
         cache.set(cacheKey, { data: result, timestamp: Date.now() })
         return NextResponse.json(result)
     } catch {
-        console.error("Route distance processing failed", { stage })
-        return NextResponse.json({ error: "Failed to calculate route distance", stage }, { status: 500 })
+        return NextResponse.json({ error: "Failed to calculate route distance" }, { status: 500 })
     }
 }
