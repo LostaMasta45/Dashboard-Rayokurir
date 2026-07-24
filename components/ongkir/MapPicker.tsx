@@ -6,6 +6,7 @@ import { MapContainer, TileLayer, Marker, Polyline, useMapEvents, useMap } from 
 import L from "leaflet"
 import { MapPin, Navigation, GripVertical, Loader2, MousePointerClick, Crosshair } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { RouteMode } from "@/lib/routing"
 
 // Direct Leaflet CSS import - required for proper tile rendering
 import "leaflet/dist/leaflet.css"
@@ -71,6 +72,7 @@ interface MapPickerProps {
     selectionMode?: "pickup" | "dropoff" | null
     onCenterChange?: (lat: number, lng: number) => void
     flyTo?: { lat: number, lng: number } | null
+    routeMode?: RouteMode
 }
 
 // Draggable Marker Component
@@ -237,7 +239,8 @@ export function MapPicker({
     showRoute = true,
     selectionMode = null,
     onCenterChange,
-    flyTo = null
+    flyTo = null,
+    routeMode = "kampung"
 }: MapPickerProps) {
     const [activeMode, setActiveMode] = useState<"pickup" | "dropoff" | null>(null)
     const [routeCoords, setRouteCoords] = useState<[number, number][]>([])
@@ -275,7 +278,8 @@ export function MapPicker({
                             { lat: basecamp.lat, lng: basecamp.lng },
                             { lat: pickup.lat, lng: pickup.lng },
                             { lat: dropoff.lat, lng: dropoff.lng }
-                        ]
+                        ],
+                        routeMode
                     })
                 })
 
@@ -297,7 +301,7 @@ export function MapPicker({
             }
         }
         fetchRouteGeometry()
-    }, [pickup, dropoff, basecamp, selectionMode])
+    }, [pickup, dropoff, basecamp, selectionMode, routeMode])
 
     const handlePickupDrag = (lat: number, lng: number) => {
         if (onPickupChange) onPickupChange({ lat, lng, label: "Custom" })

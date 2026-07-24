@@ -1,178 +1,152 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getOrsProfile, parseRouteMode, type RouteMode } from "@/lib/routing"
 
 const ORS_API_KEY = process.env.OPENROUTESERVICE_API_KEY || ""
 
+interface Coordinate {
+    lat: number
+    lng: number
+}
+
 interface RouteGeometryRequest {
-    waypoints: Array<{ lat: number; lng: number }>
+    waypoints: Coordinate[]
+    routeMode?: RouteMode
 }
 
 interface RouteGeometryResponse {
-    coordinates: Array<[number, number]> // [lat, lng] pairs
+    coordinates: Array<[number, number]>
     distance_m: number
     duration_s: number
     source: "ors" | "straight"
+    route_mode: RouteMode
+    requested_mode: RouteMode
+    fallback: boolean
 }
 
-// Simple in-memory cache
 const cache = new Map<string, { data: RouteGeometryResponse; timestamp: number }>()
-const CACHE_TTL = 7 * 24 * 60 * 60 * 1000 // 7 days in ms
+const CACHE_TTL = 7 * 24 * 60 * 60 * 1000
+const CACHE_VERSION = "v4"
+
+function isCoordinate(value: unknown): value is Coordinate {
+    if (!value || typeof value !== "object") return false
+    const coordinate = value as Coordinate
+    return Number.isFinite(coordinate.lat) && Number.isFinite(coordinate.lng)
+}
+
+function haversineDistance(from: Coordinate, to: Coordinate): number {
+    const R = 6371000
+    const dLat = (to.lat - from.lat) * Math.PI / 180
+    const dLng = (to.lng - from.lng) * Math.PI / 180
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(from.lat * Math.PI / 180) * Math.cos(to.lat * Math.PI / 180) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2)
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+async function getOrsGeometry(waypoints: Coordinate[], mode: RouteMode) {
+    if (!ORS_API_KEY) return null
+
+    try {
+        const profile = getOrsProfile(mode)
+        const response = await fetch(
+            `https://api.openrouteservice.org/v2/directions/${profile}/geojson`,
+            {
+                method: "POST",
+                headers: {
+                    Authorization: ORS_API_KEY,
+                    "Content-Type": "application/json",
+                    Accept: "application/geo+json",
+                },
+                body: JSON.stringify({ coordinates: waypoints.map(({ lat, lng }) => [lng, lat]) }),
+            }
+        )
+
+        if (!response.ok) {
+            console.warn("ORS geometry request failed", { profile, status: response.status })
+            return null
+        }
+
+        const data = await response.json()
+        const feature = data.features?.[0]
+        const geometry = feature?.geometry?.coordinates
+        const summary = feature?.properties?.summary
+        if (!Array.isArray(geometry) || geometry.length < 2 || !Number.isFinite(summary?.distance) || !Number.isFinite(summary?.duration)) {
+            console.warn("ORS geometry response was incomplete", { profile })
+            return null
+        }
+
+        return {
+            coordinates: geometry.map(([lng, lat]: [number, number]) => [lat, lng] as [number, number]),
+            distance_m: Math.round(summary.distance),
+            duration_s: Math.round(summary.duration),
+        }
+    } catch {
+        console.warn("ORS geometry request raised an exception", { profile: getOrsProfile(mode) })
+        return null
+    }
+}
+
+function getStraightRoute(waypoints: Coordinate[], requestedMode: RouteMode): RouteGeometryResponse {
+    let distance = 0
+    for (let index = 0; index < waypoints.length - 1; index += 1) {
+        distance += haversineDistance(waypoints[index], waypoints[index + 1])
+    }
+
+    return {
+        coordinates: waypoints.map(({ lat, lng }) => [lat, lng]),
+        distance_m: Math.round(distance * 1.3),
+        duration_s: Math.round((distance / 1000 / 30) * 3600 * 1.3),
+        source: "straight",
+        route_mode: requestedMode,
+        requested_mode: requestedMode,
+        fallback: true,
+    }
+}
 
 export async function POST(request: NextRequest) {
     try {
         const body: RouteGeometryRequest = await request.json()
-        const { waypoints } = body
-
-        if (!waypoints || waypoints.length < 2) {
-            return NextResponse.json(
-                { error: "At least 2 waypoints required" },
-                { status: 400 }
-            )
+        if (!Array.isArray(body.waypoints) || body.waypoints.length < 2 || !body.waypoints.every(isCoordinate)) {
+            return NextResponse.json({ error: "At least two valid waypoints are required" }, { status: 400 })
         }
 
-        // Create cache key with version to invalidate old straight-line results
-        const CACHE_VERSION = "v3" // Bumped to clear old cycling-regular routes
-        const cacheKey = `${CACHE_VERSION}|${waypoints.map(w => `${w.lat.toFixed(6)},${w.lng.toFixed(6)}`).join("|")}`
+        const requestedMode = parseRouteMode(body.routeMode)
+        const cacheKey = `${CACHE_VERSION}|${requestedMode}|${body.waypoints.map(({ lat, lng }) => `${lat.toFixed(6)},${lng.toFixed(6)}`).join("|")}`
         const cached = cache.get(cacheKey)
-        // Only use cache if it's an ORS result, not a fallback
-        if (cached && Date.now() - cached.timestamp < CACHE_TTL && cached.data.source === "ors") {
-            console.log("Returning cached ORS route")
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
             return NextResponse.json(cached.data)
         }
 
-        // Try OpenRouteService API
-        if (ORS_API_KEY) {
-            try {
-                // For 2 waypoints, use GET with start/end parameters
-                // For more waypoints, we need to use POST
-                let orsResponse: Response
+        const requestedRoute = await getOrsGeometry(body.waypoints, requestedMode)
+        let result: RouteGeometryResponse
 
-                if (waypoints.length === 2) {
-                    // Simple route with start and end
-                    const start = `${waypoints[0].lng},${waypoints[0].lat}`
-                    const end = `${waypoints[1].lng},${waypoints[1].lat}`
-                    const url = `https://api.openrouteservice.org/v2/directions/driving-car?start=${start}&end=${end}`
-
-                    console.log("Calling ORS GET API:", url)
-
-                    orsResponse = await fetch(url, {
-                        method: "GET",
-                        headers: {
-                            "Authorization": ORS_API_KEY,
-                            "Accept": "application/json, application/geo+json"
-                        }
-                    })
-                } else {
-                    // Multiple waypoints - use POST with geojson format
-                    const orsCoordinates = waypoints.map(w => [w.lng, w.lat])
-                    console.log("Calling ORS POST API with coordinates:", JSON.stringify(orsCoordinates))
-
-                    orsResponse = await fetch(
-                        `https://api.openrouteservice.org/v2/directions/driving-car/geojson`,
-                        {
-                            method: "POST",
-                            headers: {
-                                "Authorization": ORS_API_KEY,
-                                "Content-Type": "application/json",
-                                "Accept": "application/json, application/geo+json"
-                            },
-                            body: JSON.stringify({
-                                coordinates: orsCoordinates
-                            })
-                        }
-                    )
-                }
-
-                const responseText = await orsResponse.text()
-                console.log("ORS Response status:", orsResponse.status)
-
-                if (orsResponse.ok) {
-                    const orsData = JSON.parse(responseText)
-
-                    // Handle both GET and POST response formats
-                    let geometryCoords: Array<[number, number]> | undefined
-                    let distance: number = 0
-                    let duration: number = 0
-
-                    if (orsData.features && orsData.features[0]) {
-                        // GeoJSON format (from both GET and POST)
-                        geometryCoords = orsData.features[0].geometry?.coordinates
-                        const summary = orsData.features[0].properties?.summary
-                        distance = summary?.distance || 0
-                        duration = summary?.duration || 0
-                    }
-
-                    if (geometryCoords && geometryCoords.length > 0) {
-                        // Convert from [lng, lat] to [lat, lng] for Leaflet
-                        const coordinates: Array<[number, number]> = geometryCoords.map(
-                            (coord: [number, number]) => [coord[1], coord[0]]
-                        )
-
-                        console.log("ORS returned", coordinates.length, "coordinate points for route")
-
-                        const result: RouteGeometryResponse = {
-                            coordinates,
-                            distance_m: Math.round(distance),
-                            duration_s: Math.round(duration),
-                            source: "ors"
-                        }
-
-                        // Cache the result with a fresh timestamp
-                        cache.set(cacheKey, { data: result, timestamp: Date.now() })
-
-                        return NextResponse.json(result)
-                    } else {
-                        console.log("ORS response has no geometry coordinates, data:", JSON.stringify(orsData).substring(0, 300))
-                    }
-                } else {
-                    console.error("ORS API error response:", orsResponse.status, responseText.substring(0, 300))
-                }
-            } catch (orsError) {
-                console.error("ORS API exception:", orsError)
+        if (requestedRoute) {
+            result = {
+                ...requestedRoute,
+                source: "ors",
+                route_mode: requestedMode,
+                requested_mode: requestedMode,
+                fallback: false,
             }
+        } else if (requestedMode === "kampung") {
+            const carRoute = await getOrsGeometry(body.waypoints, "car")
+            result = carRoute
+                ? {
+                    ...carRoute,
+                    source: "ors",
+                    route_mode: "car",
+                    requested_mode: "kampung",
+                    fallback: true,
+                }
+                : getStraightRoute(body.waypoints, "kampung")
         } else {
-            console.log("No ORS API key configured")
-        }
-
-        // Fallback to straight lines
-        const coordinates: Array<[number, number]> = waypoints.map(w => [w.lat, w.lng])
-
-        // Calculate approximate distance using Haversine
-        let totalDistance = 0
-        for (let i = 0; i < waypoints.length - 1; i++) {
-            totalDistance += haversineDistance(
-                waypoints[i].lat, waypoints[i].lng,
-                waypoints[i + 1].lat, waypoints[i + 1].lng
-            )
-        }
-
-        const result: RouteGeometryResponse = {
-            coordinates,
-            distance_m: Math.round(totalDistance * 1.3), // Add 30% for road vs straight-line
-            duration_s: Math.round((totalDistance / 30) * 3600 * 1.3), // 30km/h average
-            source: "straight"
+            result = getStraightRoute(body.waypoints, "car")
         }
 
         cache.set(cacheKey, { data: result, timestamp: Date.now() })
-
         return NextResponse.json(result)
-
-    } catch (error) {
-        console.error("Route geometry error:", error)
-        return NextResponse.json(
-            { error: "Failed to calculate route geometry" },
-            { status: 500 }
-        )
+    } catch {
+        return NextResponse.json({ error: "Failed to calculate route geometry" }, { status: 500 })
     }
-}
-
-function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-    const R = 6371 // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180
-    const dLng = (lng2 - lng1) * Math.PI / 180
-    const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLng / 2) * Math.sin(dLng / 2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    return R * c
 }

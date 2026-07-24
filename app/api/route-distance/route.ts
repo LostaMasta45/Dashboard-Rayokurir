@@ -1,35 +1,84 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getOrsProfile, parseRouteMode, type RouteMode } from "@/lib/routing"
 
 const ORS_API_KEY = process.env.OPENROUTESERVICE_API_KEY || ""
 
+interface Coordinate {
+    lat: number
+    lng: number
+}
+
 interface RouteRequest {
-    from: { lat: number; lng: number }
-    to: { lat: number; lng: number }
+    from: Coordinate
+    to: Coordinate
+    routeMode?: RouteMode
 }
 
 interface RouteResponse {
     distance_m: number
     duration_s: number
     source: "ors" | "haversine"
+    route_mode: RouteMode
+    requested_mode: RouteMode
+    fallback: boolean
 }
 
-// Simple in-memory cache
 const cache = new Map<string, { data: RouteResponse; timestamp: number }>()
-const CACHE_TTL = 7 * 24 * 60 * 60 * 1000 // 7 days in ms
+const CACHE_TTL = 7 * 24 * 60 * 60 * 1000
+const CACHE_VERSION = "v4"
 
-/**
- * Calculate Haversine distance as fallback
- */
-function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-    const R = 6371000 // Earth's radius in meters
-    const dLat = (lat2 - lat1) * Math.PI / 180
-    const dLng = (lng2 - lng1) * Math.PI / 180
+function isCoordinate(value: unknown): value is Coordinate {
+    if (!value || typeof value !== "object") return false
+    const coordinate = value as Coordinate
+    return Number.isFinite(coordinate.lat) && Number.isFinite(coordinate.lng)
+}
+
+function haversineDistance(from: Coordinate, to: Coordinate): number {
+    const R = 6371000
+    const dLat = (to.lat - from.lat) * Math.PI / 180
+    const dLng = (to.lng - from.lng) * Math.PI / 180
     const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.cos(from.lat * Math.PI / 180) * Math.cos(to.lat * Math.PI / 180) *
         Math.sin(dLng / 2) * Math.sin(dLng / 2)
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    return R * c
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+async function getOrsRoute(from: Coordinate, to: Coordinate, mode: RouteMode) {
+    if (!ORS_API_KEY) return null
+
+    try {
+        const profile = getOrsProfile(mode)
+        const response = await fetch(
+            `https://api.openrouteservice.org/v2/directions/${profile}?start=${from.lng},${from.lat}&end=${to.lng},${to.lat}`,
+            {
+                headers: {
+                    Authorization: ORS_API_KEY,
+                    Accept: "application/json, application/geo+json",
+                },
+            }
+        )
+
+        if (!response.ok) {
+            console.warn("ORS distance request failed", { profile, status: response.status })
+            return null
+        }
+
+        const data = await response.json()
+        const segment = data.features?.[0]?.properties?.segments?.[0]
+        if (!segment || !Number.isFinite(segment.distance) || !Number.isFinite(segment.duration)) {
+            console.warn("ORS distance response was incomplete", { profile })
+            return null
+        }
+
+        return {
+            distance_m: Math.round(segment.distance),
+            duration_s: Math.round(segment.duration),
+        }
+    } catch {
+        console.warn("ORS distance request raised an exception", { profile: getOrsProfile(mode) })
+        return null
+    }
 }
 
 export async function POST(request: NextRequest) {
@@ -37,77 +86,64 @@ export async function POST(request: NextRequest) {
         const body: RouteRequest = await request.json()
         const { from, to } = body
 
-        if (!from?.lat || !from?.lng || !to?.lat || !to?.lng) {
-            return NextResponse.json(
-                { error: "Invalid coordinates" },
-                { status: 400 }
-            )
+        if (!isCoordinate(from) || !isCoordinate(to)) {
+            return NextResponse.json({ error: "Invalid coordinates" }, { status: 400 })
         }
 
-        // Check cache
-        const cacheKey = `${from.lat},${from.lng}-${to.lat},${to.lng}`
+        const requestedMode = parseRouteMode(body.routeMode)
+        const cacheKey = `${CACHE_VERSION}|${requestedMode}|${from.lat.toFixed(6)},${from.lng.toFixed(6)}|${to.lat.toFixed(6)},${to.lng.toFixed(6)}`
         const cached = cache.get(cacheKey)
         if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
             return NextResponse.json(cached.data)
         }
 
-        // Try OpenRouteService API
-        if (ORS_API_KEY) {
-            try {
-                const orsResponse = await fetch(
-                    `https://api.openrouteservice.org/v2/directions/driving-car?start=${from.lng},${from.lat}&end=${to.lng},${to.lat}`,
-                    {
-                        headers: {
-                            "Authorization": ORS_API_KEY,
-                            "Accept": "application/json"
-                        }
-                    }
-                )
+        const requestedRoute = await getOrsRoute(from, to, requestedMode)
+        let result: RouteResponse
 
-                if (orsResponse.ok) {
-                    const orsData = await orsResponse.json()
-                    const segment = orsData.features?.[0]?.properties?.segments?.[0]
-
-                    if (segment) {
-                        const result: RouteResponse = {
-                            distance_m: Math.round(segment.distance),
-                            duration_s: Math.round(segment.duration),
-                            source: "ors"
-                        }
-
-                        // Cache the result
-                        cache.set(cacheKey, { data: result, timestamp: Date.now() })
-
-                        return NextResponse.json(result)
-                    }
+        if (requestedRoute) {
+            result = {
+                ...requestedRoute,
+                source: "ors",
+                route_mode: requestedMode,
+                requested_mode: requestedMode,
+                fallback: false,
+            }
+        } else if (requestedMode === "kampung") {
+            const carRoute = await getOrsRoute(from, to, "car")
+            if (carRoute) {
+                result = {
+                    ...carRoute,
+                    source: "ors",
+                    route_mode: "car",
+                    requested_mode: "kampung",
+                    fallback: true,
                 }
-            } catch (orsError) {
-                console.error("ORS API error:", orsError)
-                // Fall through to Haversine
+            } else {
+                const straightDistance = haversineDistance(from, to)
+                result = {
+                    distance_m: Math.round(straightDistance * 1.3),
+                    duration_s: Math.round((straightDistance / 1000 / 30) * 3600 * 1.3),
+                    source: "haversine",
+                    route_mode: "kampung",
+                    requested_mode: "kampung",
+                    fallback: true,
+                }
+            }
+        } else {
+            const straightDistance = haversineDistance(from, to)
+            result = {
+                distance_m: Math.round(straightDistance * 1.3),
+                duration_s: Math.round((straightDistance / 1000 / 30) * 3600 * 1.3),
+                source: "haversine",
+                route_mode: "car",
+                requested_mode: "car",
+                fallback: true,
             }
         }
 
-        // Fallback to Haversine
-        const distance_m = haversineDistance(from.lat, from.lng, to.lat, to.lng)
-        // Estimate duration: ~30km/h average speed in rural area
-        const duration_s = (distance_m / 1000) / 30 * 3600
-
-        const result: RouteResponse = {
-            distance_m: Math.round(distance_m * 1.3), // Add 30% for road vs straight-line
-            duration_s: Math.round(duration_s * 1.3),
-            source: "haversine"
-        }
-
-        // Cache the result
         cache.set(cacheKey, { data: result, timestamp: Date.now() })
-
         return NextResponse.json(result)
-
-    } catch (error) {
-        console.error("Route distance error:", error)
-        return NextResponse.json(
-            { error: "Failed to calculate distance" },
-            { status: 500 }
-        )
+    } catch {
+        return NextResponse.json({ error: "Failed to calculate route distance" }, { status: 500 })
     }
 }

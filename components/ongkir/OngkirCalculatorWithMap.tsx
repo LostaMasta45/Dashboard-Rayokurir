@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { ArrowUpDown, Zap, MessageCircle, Calculator, Clock, Route, Info, Loader2, Map as MapIcon, Share2, Copy, Check, MapPin, ChevronRight, Navigation, ChevronDown, ChevronUp, ArrowLeft, Crosshair } from "lucide-react"
+import { ArrowUpDown, Zap, MessageCircle, Calculator, Clock, Route, Info, Loader2, Map as MapIcon, Share2, Copy, Check, MapPin, ChevronRight, Navigation, ChevronDown, ChevronUp, ArrowLeft, Crosshair, Bike, Car } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
@@ -12,6 +12,7 @@ import { GoogleMapsLinkInput } from "./GoogleMapsLinkInput"
 import { calculateOngkir, formatRupiah, generateWhatsAppLink, BASECAMP, haversineDistance } from "@/lib/pricing"
 import "@/styles/leaflet-custom.css"
 import { cn } from "@/lib/utils"
+import type { RouteMode } from "@/lib/routing"
 
 type Status = "idle" | "partial" | "loading" | "ready" | "error"
 
@@ -33,6 +34,8 @@ interface CalculationResult {
     d1DurationMinutes: number
     d2DurationMinutes: number
     totalDurationMinutes: number
+    routeMode: RouteMode
+    fallbackNote: string | null
 }
 
 interface OngkirCalculatorWithMapProps {
@@ -45,6 +48,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
     const [pickup, setPickup] = useState<Location | null>(null)
     const [dropoff, setDropoff] = useState<Location | null>(null)
     const [isExpress, setIsExpress] = useState(false)
+    const [routeMode, setRouteMode] = useState<RouteMode>("kampung")
     const [status, setStatus] = useState<Status>("idle")
     const [result, setResult] = useState<CalculationResult | null>(null)
     const [notes, setNotes] = useState("")
@@ -58,6 +62,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
     const [flyToLocation, setFlyToLocation] = useState<{ lat: number, lng: number } | null>(null)
     const [showLinkInput, setShowLinkInput] = useState<"pickup" | "dropoff" | null>(null)
     const geocodeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    const calculationRequestRef = useRef(0)
 
     // Load from URL params on mount
     useEffect(() => {
@@ -70,6 +75,9 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
         const dropoffLng = params.get("dropoff_lng")
         const dropoffLabel = params.get("dropoff_label")
         const express = params.get("express")
+        const sharedRouteMode = params.get("route_mode")
+
+        if (sharedRouteMode === "car") setRouteMode("car")
 
         if (pickupLat && pickupLng) {
             setPickup({
@@ -96,6 +104,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
     const calculateRoute = useCallback(async () => {
         if (!pickup || !dropoff) return
 
+        const requestId = ++calculationRequestRef.current
         setStatus("loading")
 
         try {
@@ -105,9 +114,11 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     from: { lat: BASECAMP.lat, lng: BASECAMP.lng },
-                    to: { lat: pickup.lat, lng: pickup.lng }
+                    to: { lat: pickup.lat, lng: pickup.lng },
+                    routeMode
                 })
             })
+            if (!d1Response.ok) throw new Error("Failed to calculate pickup route")
             const d1Data = await d1Response.json()
             const d1Km = d1Data.distance_m / 1000
 
@@ -117,10 +128,16 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     from: { lat: pickup.lat, lng: pickup.lng },
-                    to: { lat: dropoff.lat, lng: dropoff.lng }
+                    to: { lat: dropoff.lat, lng: dropoff.lng },
+                    routeMode
                 })
             })
+            if (!d2Response.ok) throw new Error("Failed to calculate delivery route")
             const d2Data = await d2Response.json()
+            if (!Number.isFinite(d1Data.distance_m) || !Number.isFinite(d2Data.distance_m) || !Number.isFinite(d1Data.duration_s) || !Number.isFinite(d2Data.duration_s)) {
+                throw new Error("Route response was incomplete")
+            }
+            if (requestId !== calculationRequestRef.current) return
             const d2Km = d2Data.distance_m / 1000
 
             // Calculate pricing
@@ -134,13 +151,20 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                 d2Km,
                 d1DurationMinutes,
                 d2DurationMinutes,
-                totalDurationMinutes: d1DurationMinutes + d2DurationMinutes
+                totalDurationMinutes: d1DurationMinutes + d2DurationMinutes,
+                routeMode,
+                fallbackNote: d1Data.fallback || d2Data.fallback
+                    ? (d1Data.source === "haversine" || d2Data.source === "haversine"
+                        ? "Estimasi jarak sementara digunakan karena rute jalan tidak tersedia."
+                        : "Sebagian jalur kampung tidak tersedia, sehingga estimasi memakai rute mobil.")
+                    : null
             })
             setStatus("ready")
             // setShowMap(false) // Don't auto-hide map on mobile anymore, let user decide
 
         } catch (error) {
-            console.error("Route calculation error:", error)
+            if (requestId !== calculationRequestRef.current) return
+            console.error("Route calculation error")
 
             // Fallback to Haversine
             const d1Km = haversineDistance(BASECAMP.lat, BASECAMP.lng, pickup.lat, pickup.lng)
@@ -155,12 +179,14 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                 d2Km,
                 d1DurationMinutes,
                 d2DurationMinutes,
-                totalDurationMinutes: d1DurationMinutes + d2DurationMinutes
+                totalDurationMinutes: d1DurationMinutes + d2DurationMinutes,
+                routeMode,
+                fallbackNote: "Estimasi jarak sementara digunakan karena rute jalan tidak tersedia."
             })
             setStatus("ready")
             // setShowMap(false)
         }
-    }, [pickup, dropoff, isExpress])
+    }, [pickup, dropoff, isExpress, routeMode])
 
     // Recalculate when express changes
     useEffect(() => {
@@ -209,9 +235,10 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
         params.set("dropoff_lat", dropoff.lat.toString())
         params.set("dropoff_lng", dropoff.lng.toString())
         params.set("dropoff_label", dropoff.label)
+        params.set("route_mode", routeMode)
         if (isExpress) params.set("express", "true")
         return `${baseUrl}?${params.toString()}`
-    }, [pickup, dropoff, isExpress])
+    }, [pickup, dropoff, isExpress, routeMode])
 
     // Copy link to clipboard
     const copyToClipboard = useCallback(async () => {
@@ -456,6 +483,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                             onDropoffChange={handleMapDropoffChange}
                             className="h-full w-full"
                             showRoute={true}
+                            routeMode={routeMode}
                         />
                     </div>
                     {/* Close Map Button (Mobile only) */}
@@ -623,6 +651,43 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                         </div>
                     </div>
 
+                    <div className="mt-6 rounded-2xl border border-teal-100 bg-teal-50/60 p-3 dark:border-teal-900/50 dark:bg-teal-950/20">
+                        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-teal-800 dark:text-teal-300">Pilihan rute</p>
+                        <div role="radiogroup" aria-label="Pilihan rute" className="grid grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked={routeMode === "kampung"}
+                                onClick={() => setRouteMode("kampung")}
+                                className={cn(
+                                    "flex min-h-12 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold transition-all",
+                                    routeMode === "kampung"
+                                        ? "border-teal-600 bg-teal-600 text-white shadow-sm"
+                                        : "border-transparent bg-white text-gray-600 hover:border-teal-200 dark:bg-gray-900 dark:text-gray-300"
+                                )}
+                            >
+                                <Bike size={18} /> Jalur kampung
+                            </button>
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked={routeMode === "car"}
+                                onClick={() => setRouteMode("car")}
+                                className={cn(
+                                    "flex min-h-12 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold transition-all",
+                                    routeMode === "car"
+                                        ? "border-gray-800 bg-gray-800 text-white shadow-sm dark:border-gray-100 dark:bg-gray-100 dark:text-gray-900"
+                                        : "border-transparent bg-white text-gray-600 hover:border-gray-300 dark:bg-gray-900 dark:text-gray-300"
+                                )}
+                            >
+                                <Car size={18} /> Jalan mobil
+                            </button>
+                        </div>
+                        <p className="mt-2 px-1 text-[11px] leading-relaxed text-teal-800/80 dark:text-teal-200/80">
+                            Jalur kampung adalah estimasi data peta; cek kondisi, akses, dan keamanan jalan di lapangan.
+                        </p>
+                    </div>
+
                     {/* Express Toggle */}
                     <div className="group mt-8 flex items-center justify-between p-4 bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20 rounded-2xl hover:border-amber-200 dark:hover:border-amber-900/40 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all cursor-pointer shadow-sm" onClick={() => setIsExpress(!isExpress)}>
                         <div className="flex items-center gap-3">
@@ -672,7 +737,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                                     className="h-full flex flex-col items-center justify-center p-10"
                                 >
                                     <Loader2 size={40} className="animate-spin text-teal-500 mb-4" />
-                                    <p className="text-gray-500 font-medium animate-pulse">Menghitung rute terbaik...</p>
+                                    <p className="text-gray-500 font-medium animate-pulse">Menghitung {routeMode === "kampung" ? "jalur kampung" : "rute mobil"}...</p>
                                 </motion.div>
                             )}
 
@@ -714,11 +779,17 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                                                 </div>
                                                 <div className="flex items-center gap-2 text-gray-300 text-sm">
                                                     <Route size={16} className="text-teal-400" />
-                                                    <span>Rute Tercepat</span>
+                                                    <span>{result.routeMode === "kampung" ? "Jalur kampung" : "Rute mobil"}</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
+
+                                    {result.fallbackNote && (
+                                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                                            {result.fallbackNote}
+                                        </div>
+                                    )}
 
                                     {/* Timeline Details */}
                                     <div className="bg-gray-50 dark:bg-gray-800/50 rounded-3xl p-6 border border-gray-100 dark:border-gray-800">
