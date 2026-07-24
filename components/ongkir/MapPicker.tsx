@@ -23,10 +23,10 @@ const createIcon = (colorClass: string, ringClass: string, label: string) => L.d
                     <path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z"/>
                 </svg>
             </div>
-            <div class="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gray-900/90 text-white text-xs px-3 py-1.5 rounded-full font-bold shadow-lg border border-white/20 z-20">
+            <div class="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-gray-900/95 text-white text-xs px-3 py-1.5 rounded-full font-extrabold shadow-xl border border-white/30 z-20">
                 ${label}
             </div>
-            <div class="absolute top-[80%] left-1/2 -translate-x-1/2 w-1 h-3 bg-black/20 rounded-full blur-[1px]"></div>
+            <div class="absolute top-[80%] left-1/2 -translate-x-1/2 w-1 h-3 bg-black/30 rounded-full blur-[1px]"></div>
         </div>
     `,
     iconSize: [48, 60],
@@ -40,13 +40,13 @@ const basecampIcon = L.divIcon({
     className: "custom-marker-basecamp",
     html: `
         <div class="relative">
-             <div class="w-10 h-10 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-full border-[3px] border-white dark:border-slate-800 shadow-xl flex items-center justify-center -translate-x-1/2 -translate-y-1/2">
+             <div class="w-10 h-10 bg-slate-900 text-white rounded-full border-[3px] border-white shadow-xl flex items-center justify-center -translate-x-1/2 -translate-y-1/2">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                      <path d="M3 21h18v-8H3v8zm6-11V7l3-3 3 3v3h-6z"/>
                      <path d="M0 0h24v24H0z" fill="none"/>
                 </svg>
             </div>
-           <div class="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-[10px] px-2.5 py-1 rounded-md font-extrabold shadow-lg">
+           <div class="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900 text-white text-[10px] px-2.5 py-1 rounded-md font-extrabold shadow-xl border border-white/20">
                 BASECAMP
             </div>
         </div>
@@ -122,7 +122,6 @@ function MapBoundsUpdater({ pickup, dropoff, basecamp, routeCoords, selectionMod
     useEffect(() => {
         if (selectionMode) return // Don't auto-fit in selection mode, let user pan freely
 
-        // Only auto-fit on first load or significant route changes if not manually interacting
         if (routeCoords.length > 0) {
             const bounds = L.latLngBounds(routeCoords)
             map.fitBounds(bounds, { padding: [80, 80], maxZoom: 16 })
@@ -218,7 +217,6 @@ function MapStateListener({ onMoveStart, onMoveEnd, onCenterChange }: {
             }
         },
         zoomend: () => {
-            // ensure we capture center update on zoom too
             if (onCenterChange) {
                 const center = map.getCenter()
                 onCenterChange(center.lat, center.lng)
@@ -245,12 +243,9 @@ export function MapPicker({
     const [routeCoords, setRouteCoords] = useState<[number, number][]>([])
     const [isLoadingRoute, setIsLoadingRoute] = useState(false)
     const [isMapMoving, setIsMapMoving] = useState(false)
-    const { resolvedTheme } = useTheme()
 
-    // Dynamic tile URL based on theme
-    const tileUrl = resolvedTheme === "dark"
-        ? "https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png"
-        : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+    // Map tiles remain bright & clear CARTO voyager tiles in both light & dark modes
+    const tileUrl = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
 
     // Calculate center point
     const center: [number, number] = selectionMode === "pickup" && pickup
@@ -335,19 +330,19 @@ export function MapPicker({
     const guidance = getGuidanceText()
 
     return (
-        <div className={cn("relative h-full w-full bg-slate-100 dark:bg-gray-950 transition-colors", className)}>
+        <div className={cn("relative h-full w-full bg-slate-100 dark:bg-slate-900 transition-colors", className)}>
 
-            {/* Top Floating Bar for Guidance & Mode - Hide if in Selection Mode */}
+            {/* Top Floating Bar for Guidance & Mode */}
             {!selectionMode && (
                 <div className="absolute top-4 inset-x-4 z-[500] pointer-events-none flex justify-center">
                     <div className={cn(
-                        "pointer-events-auto bg-white/95 dark:bg-gray-900/95 backdrop-blur-md px-4 py-2 rounded-full shadow-lg border border-gray-200/80 dark:border-gray-700/80 flex items-center gap-3 transition-all",
-                        activeMode ? "scale-105 ring-4 ring-teal-500/20 dark:ring-teal-400/20" : ""
+                        "pointer-events-auto bg-white/95 dark:bg-gray-900/95 backdrop-blur-md px-4 py-2 rounded-full shadow-xl border border-gray-200/90 dark:border-gray-700 flex items-center gap-3 transition-all",
+                        activeMode ? "scale-105 ring-4 ring-teal-500/30" : ""
                     )}>
                         <div className={cn(
-                            "flex items-center gap-2 text-xs sm:text-sm font-semibold transition-colors",
+                            "flex items-center gap-2 text-xs sm:text-sm font-bold transition-colors",
                             guidance.color === "teal" || activeMode === "pickup" ? "text-teal-600 dark:text-teal-400" :
-                                guidance.color === "orange" || activeMode === "dropoff" ? "text-orange-600 dark:text-orange-400" : "text-gray-700 dark:text-gray-200"
+                                guidance.color === "orange" || activeMode === "dropoff" ? "text-orange-600 dark:text-orange-400" : "text-gray-800 dark:text-gray-100"
                         )}>
                             {activeMode ? <Crosshair size={18} className="animate-pulse" /> : guidance.icon}
                             <span>{guidance.text}</span>
@@ -360,16 +355,15 @@ export function MapPicker({
             {/* Center Pin Overlay (Selection Mode Only) */}
             {selectionMode && (
                 <div className="absolute inset-0 z-[1000] pointer-events-none flex items-center justify-center pb-[0px]">
-                    {/* The Pin Area */}
                     <div className="relative flex flex-col items-center">
 
                         {/* Tooltip Instruction */}
                         <div className={cn(
-                            "absolute -top-16 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-xs px-3 py-1.5 rounded-xl shadow-2xl font-bold transition-all duration-300 border border-gray-700 dark:border-gray-300",
+                            "absolute -top-16 bg-gray-900 text-white text-xs px-3.5 py-1.5 rounded-xl shadow-2xl font-bold transition-all duration-300 border border-white/20",
                             isMapMoving ? "opacity-0 translate-y-2" : "opacity-100 translate-y-0"
                         )}>
                             Lepas untuk pilih lokasi ini
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 dark:bg-gray-100 rotate-45"></div>
+                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
                         </div>
 
                         {/* The Pin Circle */}
@@ -390,27 +384,27 @@ export function MapPicker({
 
                         {/* Stick Effect */}
                         <div className={cn(
-                            "absolute left-1/2 -translate-x-1/2 w-[3px] bg-gray-600/50 dark:bg-gray-300/50 rounded-full transition-all duration-300",
+                            "absolute left-1/2 -translate-x-1/2 w-[3px] bg-gray-800/60 rounded-full transition-all duration-300",
                             isMapMoving ? "h-[20px] bottom-[28px] opacity-30" : "h-[20px] bottom-[20px] opacity-100"
                         )}></div>
 
                         {/* Shadow on ground */}
                         <div className={cn(
-                            "absolute bottom-0 left-1/2 -translate-x-1/2 bg-black/30 dark:bg-black/60 rounded-full blur-[1px] transition-all duration-300",
-                            isMapMoving ? "w-2 h-1 opacity-20" : "w-4 h-2 opacity-50"
+                            "absolute bottom-0 left-1/2 -translate-x-1/2 bg-black/40 rounded-full blur-[1px] transition-all duration-300",
+                            isMapMoving ? "w-2 h-1 opacity-20" : "w-4 h-2 opacity-60"
                         )}></div>
                     </div>
                 </div>
             )}
 
-            {/* Right Side Control Buttons - Floating - Hide in selection mode */}
+            {/* Right Side Control Buttons */}
             {!selectionMode && (
                 <div className="absolute top-20 right-4 z-[500] flex flex-col gap-3">
                     <button
                         onClick={() => setActiveMode(activeMode === "pickup" ? null : "pickup")}
                         className={cn(
-                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-xl hover:scale-105 active:scale-95 border border-gray-200/80 dark:border-gray-700",
-                            activeMode === "pickup" ? "bg-teal-500 text-white ring-4 ring-teal-500/30" : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:text-teal-600 dark:hover:text-teal-400"
+                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-2xl hover:scale-105 active:scale-95 border border-gray-200/90 dark:border-gray-700",
+                            activeMode === "pickup" ? "bg-teal-500 text-white ring-4 ring-teal-500/30" : "bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 hover:text-teal-600 dark:hover:text-teal-400"
                         )}
                         title="Pilih Titik Jemput di Peta"
                     >
@@ -419,8 +413,8 @@ export function MapPicker({
                     <button
                         onClick={() => setActiveMode(activeMode === "dropoff" ? null : "dropoff")}
                         className={cn(
-                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-xl hover:scale-105 active:scale-95 border border-gray-200/80 dark:border-gray-700",
-                            activeMode === "dropoff" ? "bg-orange-500 text-white ring-4 ring-orange-500/30" : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:text-orange-600 dark:hover:text-orange-400"
+                            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-2xl hover:scale-105 active:scale-95 border border-gray-200/90 dark:border-gray-700",
+                            activeMode === "dropoff" ? "bg-orange-500 text-white ring-4 ring-orange-500/30" : "bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 hover:text-orange-600 dark:hover:text-orange-400"
                         )}
                         title="Pilih Titik Antar di Peta"
                     >
@@ -443,7 +437,6 @@ export function MapPicker({
                 <MapBoundsUpdater pickup={pickup} dropoff={dropoff} basecamp={basecamp} routeCoords={routeCoords} selectionMode={selectionMode} />
                 <MapFlyTo target={flyTo} />
 
-                {/* Event Listener for Moving State */}
                 <MapStateListener
                     onMoveStart={() => setIsMapMoving(true)}
                     onMoveEnd={() => setIsMapMoving(false)}

@@ -22,29 +22,26 @@
     }
 }
 
-/* Map container styling */
+/* Map container styling - bright background always for map tiles */
 .leaflet-container {
     font-family: inherit;
     border-radius: inherit;
     background-color: #f8fafc !important;
 }
 
-.dark .leaflet-container {
-    background-color: #090d16 !important;
-}
-
-/* Hide default Leaflet attribution styling override */
+/* Leaflet attribution styling */
 .leaflet-control-attribution {
     font-size: 10px !important;
-    background: rgba(255, 255, 255, 0.85) !important;
-    color: #475569 !important;
+    background: rgba(255, 255, 255, 0.88) !important;
+    color: #334155 !important;
     padding: 2px 6px !important;
     border-radius: 6px 0 0 0 !important;
+    font-weight: 500 !important;
 }
 
 .dark .leaflet-control-attribution {
-    background: rgba(15, 23, 42, 0.85) !important;
-    color: #94a3b8 !important;
+    background: rgba(15, 23, 42, 0.88) !important;
+    color: #e2e8f0 !important;
 }
 
 .dark .leaflet-control-attribution a {
@@ -53,20 +50,20 @@
 
 /* Zoom control styling */
 .leaflet-control-zoom {
-    border: 1px solid rgba(226, 232, 240, 0.8) !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+    border: 1px solid rgba(203, 213, 225, 0.9) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15) !important;
     border-radius: 12px !important;
     overflow: hidden;
 }
 
 .dark .leaflet-control-zoom {
-    border: 1px solid rgba(51, 65, 85, 0.8) !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+    border: 1px solid rgba(51, 65, 85, 0.9) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45) !important;
 }
 
 .leaflet-control-zoom a {
     background: #ffffff !important;
-    color: #334155 !important;
+    color: #1e293b !important;
     border: none !important;
     width: 36px !important;
     height: 36px !important;
@@ -82,13 +79,13 @@
 }
 
 .dark .leaflet-control-zoom a {
-    background: #1e293b !important;
-    color: #f1f5f9 !important;
+    background: #0f172a !important;
+    color: #f8fafc !important;
     border-bottom: 1px solid #334155 !important;
 }
 
 .dark .leaflet-control-zoom a:hover {
-    background: #334155 !important;
+    background: #1e293b !important;
     color: #2dd4bf !important;
 }
 
@@ -109,7 +106,7 @@
 
 .dark .leaflet-popup-content-wrapper,
 .dark .leaflet-popup-tip {
-    background: #1e293b !important;
+    background: #0f172a !important;
     color: #f8fafc !important;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
 }
