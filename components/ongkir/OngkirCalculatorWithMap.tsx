@@ -6,7 +6,6 @@ import { ArrowUpDown, Zap, MessageCircle, Calculator, Clock, Route, Info, Loader
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { LocationSearchInput } from "./LocationSearchInput"
 import { MapPicker } from "./MapPickerWrapper"
 import { GoogleMapsLinkInput } from "./GoogleMapsLinkInput"
 import { calculateOngkir, formatRupiah, generateWhatsAppLink, BASECAMP, haversineDistance } from "@/lib/pricing"
@@ -438,7 +437,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
     const closeSelectionMode = useCallback(() => {
         // If we pushed a history state, go back
         // Otherwise just close the modal
-        if (window.history.state?.modal === 'map_selection') {
+        if (window.history.state?.modal === 'map') {
             window.history.back()
         } else {
             setSelectingMode(null)
@@ -527,37 +526,52 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                         <div className="absolute left-[26px] top-10 bottom-10 w-0.5 bg-gray-200 dark:bg-gray-700 border-l border-dashed border-transparent pointer-events-none hidden md:block" />
 
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center">
                                 <label className="text-xs font-bold uppercase tracking-wider text-teal-600 flex items-center gap-1.5 ml-1">
                                     <div className="w-2 h-2 rounded-full bg-teal-500 shadow-[0_0_0_4px_rgba(20,184,166,0.1)]"></div>
                                     Lokasi Jemput
                                 </label>
+                            </div>
+                            <div className="rounded-2xl border border-teal-100 bg-teal-50/50 p-3 dark:border-teal-900/40 dark:bg-teal-950/20">
+                                {pickup ? (
+                                    <div className="flex items-start gap-2">
+                                        <MapPin size={16} className="mt-0.5 shrink-0 text-teal-600" />
+                                        <p className="min-w-0 flex-1 text-sm font-medium leading-snug text-gray-800 dark:text-gray-100">{pickup.label}</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setPickup(null)}
+                                            className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-teal-700 hover:bg-teal-100 dark:text-teal-300 dark:hover:bg-teal-900/40"
+                                        >
+                                            Ubah
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada titik jemput dipilih.</p>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
                                 <Button
-                                    variant="ghost"
-                                    size="sm"
+                                    type="button"
                                     onClick={() => openSelectionMode("pickup")}
-                                    className="h-6 text-[10px] px-2 text-teal-600 hover:text-teal-700 hover:bg-teal-50 -mr-2"
+                                    className="h-11 rounded-xl bg-teal-600 text-xs font-bold hover:bg-teal-700"
                                 >
-                                    <MapPin size={12} className="mr-1" />
-                                    Pilih lewat Peta
+                                    <MapPin size={16} /> Pilih peta
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setShowLinkInput(showLinkInput === "pickup" ? null : "pickup")}
+                                    className="h-11 rounded-xl border-teal-200 text-xs font-bold text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300"
+                                >
+                                    <Copy size={15} /> Tempel link
                                 </Button>
                             </div>
-                            <LocationSearchInput
-                                onSelect={(loc) => {
-                                    setPickup({ ...loc, id: `search-pickup-${Date.now()}` })
-                                }}
-                                placeholder="Cari alamat jemput..."
-                                icon="pickup"
-                                value={pickup?.label || ""}
-                                onClear={() => setPickup(null)}
-                            />
-                            {/* Google Maps Link Paste */}
-                            <div className="mt-1.5">
+                            <div>
                                 {showLinkInput === "pickup" ? (
-                                    <div className="space-y-1.5">
+                                    <div className="space-y-2 rounded-2xl border border-teal-100 bg-white p-3 shadow-sm dark:border-teal-900/40 dark:bg-gray-900">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-1">Paste link Google Maps:</span>
-                                            <button onClick={() => setShowLinkInput(null)} className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1">
+                                            <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">Tempel link Google Maps</span>
+                                            <button type="button" onClick={() => setShowLinkInput(null)} className="rounded px-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                                                 Tutup
                                             </button>
                                         </div>
@@ -569,15 +583,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                                             }}
                                         />
                                     </div>
-                                ) : (
-                                    <button
-                                        onClick={() => setShowLinkInput("pickup")}
-                                        className="flex items-center gap-1.5 text-[10px] text-gray-400 dark:text-gray-500 hover:text-teal-600 dark:hover:text-teal-400 transition-colors ml-1 py-0.5"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
-                                        Punya link Google Maps? Paste di sini
-                                    </button>
-                                )}
+                                ) : null}
                             </div>
                         </div>
 
@@ -596,37 +602,52 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                         </div>
 
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center">
                                 <label className="text-xs font-bold uppercase tracking-wider text-orange-600 flex items-center gap-1.5 ml-1">
                                     <div className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_0_4px_rgba(249,115,22,0.1)]"></div>
                                     Tujuan Antar
                                 </label>
+                            </div>
+                            <div className="rounded-2xl border border-orange-100 bg-orange-50/50 p-3 dark:border-orange-900/40 dark:bg-orange-950/20">
+                                {dropoff ? (
+                                    <div className="flex items-start gap-2">
+                                        <Navigation size={16} className="mt-0.5 shrink-0 text-orange-600" />
+                                        <p className="min-w-0 flex-1 text-sm font-medium leading-snug text-gray-800 dark:text-gray-100">{dropoff.label}</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setDropoff(null)}
+                                            className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-orange-700 hover:bg-orange-100 dark:text-orange-300 dark:hover:bg-orange-900/40"
+                                        >
+                                            Ubah
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada titik tujuan dipilih.</p>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
                                 <Button
-                                    variant="ghost"
-                                    size="sm"
+                                    type="button"
                                     onClick={() => openSelectionMode("dropoff")}
-                                    className="h-6 text-[10px] px-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 -mr-2"
+                                    className="h-11 rounded-xl bg-orange-600 text-xs font-bold hover:bg-orange-700"
                                 >
-                                    <Navigation size={12} className="mr-1" />
-                                    Pilih lewat Peta
+                                    <Navigation size={16} /> Pilih peta
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setShowLinkInput(showLinkInput === "dropoff" ? null : "dropoff")}
+                                    className="h-11 rounded-xl border-orange-200 text-xs font-bold text-orange-700 hover:bg-orange-50 dark:border-orange-800 dark:text-orange-300"
+                                >
+                                    <Copy size={15} /> Tempel link
                                 </Button>
                             </div>
-                            <LocationSearchInput
-                                onSelect={(loc) => {
-                                    setDropoff({ ...loc, id: `search-dropoff-${Date.now()}` })
-                                }}
-                                placeholder="Cari alamat tujuan..."
-                                icon="dropoff"
-                                value={dropoff?.label || ""}
-                                onClear={() => setDropoff(null)}
-                            />
-                            {/* Google Maps Link Paste */}
-                            <div className="mt-1.5">
+                            <div>
                                 {showLinkInput === "dropoff" ? (
-                                    <div className="space-y-1.5">
+                                    <div className="space-y-2 rounded-2xl border border-orange-100 bg-white p-3 shadow-sm dark:border-orange-900/40 dark:bg-gray-900">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-1">Paste link Google Maps:</span>
-                                            <button onClick={() => setShowLinkInput(null)} className="text-[10px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-1">
+                                            <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">Tempel link Google Maps</span>
+                                            <button type="button" onClick={() => setShowLinkInput(null)} className="rounded px-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                                                 Tutup
                                             </button>
                                         </div>
@@ -638,15 +659,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                                             }}
                                         />
                                     </div>
-                                ) : (
-                                    <button
-                                        onClick={() => setShowLinkInput("dropoff")}
-                                        className="flex items-center gap-1.5 text-[10px] text-gray-400 dark:text-gray-500 hover:text-orange-600 dark:hover:text-orange-400 transition-colors ml-1 py-0.5"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
-                                        Punya link Google Maps? Paste di sini
-                                    </button>
-                                )}
+                                ) : null}
                             </div>
                         </div>
                     </div>
@@ -932,34 +945,22 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                         transition={{ duration: 0.3, ease: "circOut" }}
                         className="fixed inset-0 z-[9999] bg-slate-100 dark:bg-black flex flex-col overflow-hidden"
                     >
-                        {/* Header */}
+                        {/* Header: deliberately non-interactive, so map gestures stay focused on the map. */}
                         <div className="absolute top-0 inset-x-0 z-[10000] pointer-events-none" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
                             <div className="px-4 pb-4">
-                                <div className="flex items-center gap-3 pointer-events-auto">
-                                    <div className="flex-1 bg-white dark:bg-gray-900 shadow-md rounded-full flex items-center p-1 pl-2 gap-2 border border-gray-100 dark:border-gray-800">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={closeSelectionMode}
-                                            className="rounded-full w-8 h-8 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 shrink-0"
-                                        >
-                                            <ArrowLeft size={20} strokeWidth={2.5} />
-                                        </Button>
-                                        <div className="flex-1 min-w-0 pr-2">
-                                            <LocationSearchInput
-                                                placeholder={selectingMode === 'pickup' ? "Cari lokasi jemput..." : "Cari lokasi tujuan..."}
-                                                icon={selectingMode || 'pickup'}
-                                                value=""
-                                                onSelect={(loc) => {
-                                                    setFlyToLocation({ lat: loc.lat, lng: loc.lng })
-                                                }}
-                                                className="w-full h-10 text-base bg-transparent px-0"
-                                                showGPS={false}
-                                                showIndicator={false}
-                                                showIcon={false}
-                                                variant="minimal"
-                                            />
-                                        </div>
+                                <div className="flex items-center gap-3 pointer-events-auto rounded-2xl border border-gray-100 bg-white/95 p-2 shadow-md backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={closeSelectionMode}
+                                        className="h-10 w-10 shrink-0 rounded-xl text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+                                        aria-label="Tutup pilihan peta"
+                                    >
+                                        <ArrowLeft size={20} strokeWidth={2.5} />
+                                    </Button>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-bold text-gray-900 dark:text-white">Pilih titik {selectingMode === "pickup" ? "jemput" : "tujuan"}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Geser peta, lalu tekan tombol di bawah peta.</p>
                                     </div>
                                 </div>
                             </div>
@@ -1006,14 +1007,14 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                             </div>
                         </div>
 
-                        {/* Footer Card */}
-                        <div className="bg-white dark:bg-gray-900 px-6 pt-6 pb-6 rounded-t-[2.5rem] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-[10000] border-t border-gray-100 relative shrink-0">
+                        {/* Sticky confirmation area, intentionally below the map gesture surface. */}
+                        <div className="relative z-[10000] shrink-0 rounded-t-[2.5rem] border-t border-gray-100 bg-white px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] dark:border-gray-800 dark:bg-gray-900">
                             {/* Drag Handle */}
                             <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full" />
 
                             <div className="mb-6">
                                 <p className="text-[11px] uppercase tracking-widest font-bold text-gray-400 dark:text-gray-500 mb-2">
-                                    Lokasi Terpilih
+                                    Titik di Tengah Peta
                                 </p>
                                 <div className="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
                                     <div className={cn(
@@ -1039,17 +1040,21 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                                 </div>
                             </div>
 
+                            <p className="mb-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400">
+                                Sudah sesuai? Konfirmasi titik ini di bawah, bukan dengan mengetuk peta.
+                            </p>
+
                             <Button
                                 onClick={confirmSelection}
                                 className={cn(
-                                    "w-full h-14 rounded-2xl font-bold text-lg shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all",
+                                    "w-full min-h-16 rounded-2xl text-base font-bold shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all",
                                     selectingMode === 'pickup'
                                         ? "bg-teal-600 hover:bg-teal-700 text-white shadow-teal-500/20"
                                         : "bg-orange-600 hover:bg-orange-700 text-white shadow-orange-500/20"
                                 )}
                             >
                                 <Check className="mr-2" size={24} strokeWidth={3} />
-                                Pilih Lokasi Ini
+                                {selectingMode === "pickup" ? "Pilih titik jemput ini" : "Pilih tujuan ini"}
                             </Button>
                         </div>
                     </motion.div>
