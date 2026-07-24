@@ -1007,55 +1007,36 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                             </div>
                         </div>
 
-                        {/* Sticky confirmation area, intentionally below the map gesture surface. */}
-                        <div className="relative z-[10000] shrink-0 rounded-t-[2.5rem] border-t border-gray-100 bg-white px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-6 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] dark:border-gray-800 dark:bg-gray-900">
-                            {/* Drag Handle */}
-                            <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full" />
-
-                            <div className="mb-6">
-                                <p className="text-[11px] uppercase tracking-widest font-bold text-gray-400 dark:text-gray-500 mb-2">
-                                    Titik di Tengah Peta
-                                </p>
-                                <div className="flex items-start gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+                        {/* Fixed bottom dock: always visible without scrolling the map. */}
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[12000] px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                            <div className="pointer-events-auto rounded-3xl border border-white/70 bg-white/95 p-3 shadow-[0_-8px_30px_rgba(15,23,42,0.2)] backdrop-blur-xl dark:border-gray-700 dark:bg-gray-900/95">
+                                <div className="mb-2 flex items-center gap-3 px-1">
                                     <div className={cn(
-                                        "w-10 h-10 rounded-full flex items-center justify-center shrink-0 shadow-sm",
-                                        selectingMode === 'pickup' ? "bg-teal-500 text-white" : "bg-orange-500 text-white"
+                                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm",
+                                        selectingMode === 'pickup' ? "bg-teal-500" : "bg-orange-500"
                                     )}>
-                                        <MapPin size={20} className="fill-current" />
+                                        <MapPin size={18} className="fill-current" />
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-bold text-gray-900 dark:text-white text-base leading-tight">
-                                            {tempLocation?.label ? (
-                                                tempLocation.label.split(',')[0]
-                                            ) : (
-                                                <span className="text-gray-400">Memuat...</span>
-                                            )}
-                                        </p>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 leading-snug mt-1 line-clamp-2">
-                                            {tempLocation?.label && tempLocation.label.includes(',')
-                                                ? tempLocation.label.split(',').slice(1).join(',').trim()
-                                                : tempLocation?.label}
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Titik di tengah peta</p>
+                                        <p className="truncate text-sm font-bold text-gray-900 dark:text-white">
+                                            {tempLocation?.label || "Memuat lokasi..."}
                                         </p>
                                     </div>
                                 </div>
+                                <Button
+                                    onClick={confirmSelection}
+                                    className={cn(
+                                        "min-h-16 w-full rounded-2xl text-base font-bold shadow-xl active:scale-[0.98]",
+                                        selectingMode === 'pickup'
+                                            ? "bg-teal-600 hover:bg-teal-700 text-white shadow-teal-500/20"
+                                            : "bg-orange-600 hover:bg-orange-700 text-white shadow-orange-500/20"
+                                    )}
+                                >
+                                    <Check className="mr-2" size={24} strokeWidth={3} />
+                                    {selectingMode === "pickup" ? "Pilih titik jemput ini" : "Pilih tujuan ini"}
+                                </Button>
                             </div>
-
-                            <p className="mb-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400">
-                                Sudah sesuai? Konfirmasi titik ini di bawah, bukan dengan mengetuk peta.
-                            </p>
-
-                            <Button
-                                onClick={confirmSelection}
-                                className={cn(
-                                    "w-full min-h-16 rounded-2xl text-base font-bold shadow-xl hover:scale-[1.01] active:scale-[0.98] transition-all",
-                                    selectingMode === 'pickup'
-                                        ? "bg-teal-600 hover:bg-teal-700 text-white shadow-teal-500/20"
-                                        : "bg-orange-600 hover:bg-orange-700 text-white shadow-orange-500/20"
-                                )}
-                            >
-                                <Check className="mr-2" size={24} strokeWidth={3} />
-                                {selectingMode === "pickup" ? "Pilih titik jemput ini" : "Pilih tujuan ini"}
-                            </Button>
                         </div>
                     </motion.div>
                 )}
