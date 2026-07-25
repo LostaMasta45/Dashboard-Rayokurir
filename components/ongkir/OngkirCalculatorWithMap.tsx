@@ -932,7 +932,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                 </div>
             </div>
 
-            {/* FULL SCREEN SELECTION MAP MODAL (Mobile Focused) */}
+            {/* FULL SCREEN SELECTION MAP MODAL (Mobile Focused & Desktop Overlay) */}
             <AnimatePresence>
                 {selectingMode && (
                     <motion.div
@@ -940,30 +940,48 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: "100%" }}
                         transition={{ duration: 0.3, ease: "circOut" }}
-                        className="fixed inset-0 z-[9999] bg-slate-100 dark:bg-gray-950 flex flex-col overflow-hidden overscroll-none"
+                        className="fixed inset-0 z-[9999] bg-slate-100 dark:bg-gray-950 flex flex-col overflow-hidden overscroll-none h-[100dvh]"
                     >
-                        {/* Header Bar */}
-                        <div className="absolute top-0 inset-x-0 z-[10000] pointer-events-none" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
-                            <div className="px-4 pb-4">
-                                <div className="flex items-center gap-3 pointer-events-auto rounded-2xl border border-gray-200/90 dark:border-gray-700/90 bg-white/95 dark:bg-gray-900/95 p-2.5 shadow-xl backdrop-blur-md">
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={closeSelectionMode}
-                                        className="h-10 w-10 shrink-0 rounded-xl text-gray-800 dark:text-gray-100 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center justify-center"
-                                        aria-label="Tutup pilihan peta"
-                                    >
-                                        <ArrowLeft size={20} strokeWidth={2.5} />
-                                    </Button>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-white">Pilih titik {selectingMode === "pickup" ? "jemput" : "tujuan"}</p>
-                                        <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">Geser peta, lalu tekan tombol konfirmasi.</p>
+                        {/* Header Bar with Top Confirmation Button */}
+                        <div className="absolute top-0 inset-x-0 z-[10000] pointer-events-none" style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}>
+                            <div className="px-3 sm:px-4 pb-2">
+                                <div className="flex items-center justify-between gap-2 pointer-events-auto rounded-2xl border border-gray-200/90 dark:border-gray-700/90 bg-white/95 dark:bg-gray-900/95 p-2 sm:p-2.5 shadow-xl backdrop-blur-md">
+                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={closeSelectionMode}
+                                            className="h-10 w-10 shrink-0 rounded-xl text-gray-800 dark:text-gray-100 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center justify-center active:scale-95 transition-transform"
+                                            aria-label="Tutup pilihan peta"
+                                        >
+                                            <ArrowLeft size={20} strokeWidth={2.5} />
+                                        </Button>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-white truncate">
+                                                Pilih titik {selectingMode === "pickup" ? "jemput" : "tujuan"}
+                                            </p>
+                                            <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
+                                                {tempLocation?.label || "Geser peta untuk memilih"}
+                                            </p>
+                                        </div>
                                     </div>
+                                    <Button
+                                        onClick={confirmSelection}
+                                        className={cn(
+                                            "h-10 px-3.5 rounded-xl text-xs sm:text-sm font-extrabold text-white shadow-md active:scale-95 transition-all shrink-0 flex items-center gap-1.5",
+                                            selectingMode === 'pickup'
+                                                ? "bg-teal-600 hover:bg-teal-700 shadow-teal-600/30"
+                                                : "bg-orange-600 hover:bg-orange-700 shadow-orange-600/30"
+                                        )}
+                                    >
+                                        <Check size={18} strokeWidth={3} />
+                                        <span>Pilih Titik Ini</span>
+                                    </Button>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Map */}
+                        {/* Map View Area */}
                         <div className="flex-1 relative bg-slate-100 dark:bg-gray-950 min-h-0">
                             {tempLocation && (
                                 <div className="absolute inset-0 touch-none overscroll-none">
@@ -981,57 +999,58 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                             )}
 
                             {/* Floating GPS Button */}
-                            <div className="absolute bottom-28 right-4 z-[5000]">
+                            <div className="absolute bottom-20 right-4 z-[5000]">
                                 <Button
                                     size="icon"
                                     onClick={handleGPS}
-                                    className="rounded-full bg-white dark:bg-gray-800 h-12 w-12 shadow-2xl text-gray-800 dark:text-white border border-gray-200 dark:border-gray-700 active:scale-95 transition-all hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-center"
+                                    className="rounded-full bg-white dark:bg-gray-800 h-11 w-11 shadow-2xl text-gray-800 dark:text-white border border-gray-200 dark:border-gray-700 active:scale-95 transition-all hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-center"
+                                    title="Lokasi Saya"
                                 >
                                     {isGeocoding ? (
-                                        <Loader2 size={20} className="animate-spin text-teal-600 dark:text-teal-400" />
+                                        <Loader2 size={18} className="animate-spin text-teal-600 dark:text-teal-400" />
                                     ) : (
-                                        <Crosshair size={22} />
+                                        <Crosshair size={20} />
                                     )}
                                 </Button>
                             </div>
 
                             {/* Center Marker Hint Overlay */}
-                            <div className="absolute top-[100px] left-1/2 -translate-x-1/2 pointer-events-none z-[4000] w-full flex justify-center px-4">
-                                <div className="bg-black/75 dark:bg-white/90 backdrop-blur-md text-white dark:text-gray-900 px-4 py-2 rounded-full text-xs font-bold shadow-xl animate-in fade-in slide-in-from-top-2 duration-500 border border-white/20 dark:border-gray-300/30">
-                                    Geser peta untuk memilih titik
+                            <div className="absolute top-[80px] left-1/2 -translate-x-1/2 pointer-events-none z-[4000] w-full flex justify-center px-4">
+                                <div className="bg-black/75 dark:bg-white/90 backdrop-blur-md text-white dark:text-gray-900 px-3.5 py-1.5 rounded-full text-[11px] sm:text-xs font-bold shadow-xl animate-in fade-in slide-in-from-top-2 duration-500 border border-white/20 dark:border-gray-300/30">
+                                    Geser peta untuk menentukan posisi
                                 </div>
                             </div>
                         </div>
 
-                        {/* Fixed Bottom Dock */}
-                        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[12000] px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                            <div className="pointer-events-auto rounded-3xl border border-gray-200/90 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 p-3.5 sm:p-4 shadow-[0_-8px_30px_rgba(15,23,42,0.3)] backdrop-blur-xl">
-                                <div className="mb-2.5 flex items-center gap-3 px-1">
+                        {/* Compact Bottom Dock Bar */}
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[12000] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                            <div className="pointer-events-auto rounded-2xl border border-gray-200/90 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 p-3 shadow-[0_-8px_30px_rgba(15,23,42,0.25)] backdrop-blur-xl max-w-lg mx-auto">
+                                <div className="flex items-center gap-2.5">
                                     <div className={cn(
-                                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm",
+                                        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white shadow-sm",
                                         selectingMode === 'pickup' ? "bg-teal-500" : "bg-orange-500"
                                     )}>
-                                        <MapPin size={18} className="fill-current" />
+                                        <MapPin size={16} className="fill-current" />
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Titik di tengah peta</p>
-                                        <p className="truncate text-xs sm:text-sm font-extrabold text-gray-900 dark:text-white">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Titik terpilih</p>
+                                        <p className="truncate text-xs font-extrabold text-gray-900 dark:text-white">
                                             {tempLocation?.label || "Memuat lokasi..."}
                                         </p>
                                     </div>
+                                    <Button
+                                        onClick={confirmSelection}
+                                        className={cn(
+                                            "h-10 px-4 rounded-xl text-xs font-extrabold text-white shadow-lg active:scale-95 transition-all shrink-0 flex items-center gap-1.5",
+                                            selectingMode === 'pickup'
+                                                ? "bg-teal-600 hover:bg-teal-700 shadow-teal-500/30"
+                                                : "bg-orange-600 hover:bg-orange-700 shadow-orange-500/30"
+                                        )}
+                                    >
+                                        <Check size={16} strokeWidth={3} />
+                                        <span>Konfirmasi</span>
+                                    </Button>
                                 </div>
-                                <Button
-                                    onClick={confirmSelection}
-                                    className={cn(
-                                        "min-h-14 sm:min-h-16 w-full touch-manipulation rounded-2xl text-sm sm:text-base font-extrabold shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2",
-                                        selectingMode === 'pickup'
-                                            ? "bg-teal-600 hover:bg-teal-700 text-white shadow-teal-500/30"
-                                            : "bg-orange-600 hover:bg-orange-700 text-white shadow-orange-500/30"
-                                    )}
-                                >
-                                    <Check size={22} strokeWidth={3} />
-                                    {selectingMode === "pickup" ? "Pilih titik jemput ini" : "Pilih tujuan ini"}
-                                </Button>
                             </div>
                         </div>
                     </motion.div>
