@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getOrsPreference, getOrsProfile, parseRouteMode, type RouteMode } from "@/lib/routing"
+import { getOsrmRoute } from "@/lib/osrm-routing"
 
 const ORS_API_KEY = process.env.OPENROUTESERVICE_API_KEY || ""
 
@@ -25,9 +26,8 @@ interface RouteGeometryResponse {
 
 const cache = new Map<string, { data: RouteGeometryResponse; timestamp: number }>()
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000
-const CACHE_VERSION = "v7"
+const CACHE_VERSION = "v8"
 const ORS_TIMEOUT_MS = 7_000
-const OSRM_TIMEOUT_MS = 4_000
 
 function isCoordinate(value: unknown): value is Coordinate {
     if (!value || typeof value !== "object") return false
@@ -46,7 +46,7 @@ function haversineDistance(from: Coordinate, to: Coordinate): number {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-async function getOrsGeometry(waypoints: Coordinate[], mode: RouteMode) {
+async function getOrsGeometrySegment(from: Coordinate, to: Coordinate, mode: RouteMode) {
     if (!ORS_API_KEY) return null
 
     const controller = new AbortController()
@@ -64,7 +64,7 @@ async function getOrsGeometry(waypoints: Coordinate[], mode: RouteMode) {
                     Accept: "application/geo+json",
                 },
                 body: JSON.stringify({
-                    coordinates: waypoints.map(({ lat, lng }) => [lng, lat]),
+                    coordinates: [[from.lng, from.lat], [to.lng, to.lat]],
                     preference: getOrsPreference(mode),
                 }),
                 cache: "no-store",
@@ -99,53 +99,34 @@ async function getOrsGeometry(waypoints: Coordinate[], mode: RouteMode) {
     }
 }
 
-async function getOsrmGeometry(waypoints: Coordinate[]) {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), OSRM_TIMEOUT_MS)
-
-    try {
-        const coordinates = waypoints.map(({ lat, lng }) => `${lng},${lat}`).join(";")
-        const url = new URL(`https://router.project-osrm.org/route/v1/driving/${coordinates}`)
-        url.searchParams.set("overview", "full")
-        url.searchParams.set("geometries", "geojson")
-        url.searchParams.set("steps", "false")
-
-        const response = await fetch(url, {
-            headers: { Accept: "application/json" },
-            cache: "no-store",
-            signal: controller.signal,
-        })
-
-        if (!response.ok) {
-            console.warn("OSRM geometry request failed", { status: response.status })
-            return null
-        }
-
-        const data = await response.json()
-        const route = data.code === "Ok" ? data.routes?.[0] : null
-        const geometry = route?.geometry?.coordinates
-        if (
-            !route ||
-            !Array.isArray(geometry) ||
-            geometry.length < 2 ||
-            !Number.isFinite(route.distance) ||
-            !Number.isFinite(route.duration)
-        ) {
-            console.warn("OSRM geometry response was incomplete")
-            return null
-        }
-
-        return {
-            coordinates: geometry.map(([lng, lat]: [number, number]) => [lat, lng] as [number, number]),
-            distance_m: Math.round(route.distance),
-            duration_s: Math.round(route.duration),
-        }
-    } catch {
-        console.warn("OSRM geometry request raised an exception")
+async function getSegmentedGeometry(
+    waypoints: Coordinate[],
+    getSegment: (from: Coordinate, to: Coordinate) => Promise<{
+        coordinates?: Array<[number, number]>
+        distance_m: number
+        duration_s: number
+    } | null>
+) {
+    const segments = await Promise.all(
+        waypoints.slice(0, -1).map((waypoint, index) =>
+            getSegment(waypoint, waypoints[index + 1])
+        )
+    )
+    if (segments.some((segment) => !segment || !segment.coordinates || segment.coordinates.length < 2)) {
         return null
-    } finally {
-        clearTimeout(timeoutId)
     }
+
+    return segments.reduce<{
+        coordinates: Array<[number, number]>
+        distance_m: number
+        duration_s: number
+    }>((combined, segment, index) => {
+        const coordinates = segment!.coordinates!
+        combined.coordinates.push(...(index === 0 ? coordinates : coordinates.slice(1)))
+        combined.distance_m += segment!.distance_m
+        combined.duration_s += segment!.duration_s
+        return combined
+    }, { coordinates: [], distance_m: 0, duration_s: 0 })
 }
 
 function getStraightRoute(waypoints: Coordinate[], requestedMode: RouteMode): RouteGeometryResponse {
@@ -181,7 +162,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(cached.data)
         }
 
-        const requestedRoute = await getOrsGeometry(body.waypoints, requestedMode)
+        const requestedRoute = await getSegmentedGeometry(
+            body.waypoints,
+            (from, to) => getOrsGeometrySegment(from, to, requestedMode)
+        )
         let result: RouteGeometryResponse
 
         if (requestedRoute) {
@@ -193,7 +177,10 @@ export async function POST(request: NextRequest) {
                 fallback: false,
             }
         } else {
-            const osrmRoute = await getOsrmGeometry(body.waypoints)
+            const osrmRoute = await getSegmentedGeometry(
+                body.waypoints,
+                (from, to) => getOsrmRoute(from, to, requestedMode, true)
+            )
             result = osrmRoute
                 ? {
                     ...osrmRoute,

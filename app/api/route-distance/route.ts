@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getOrsPreference, getOrsProfile, parseRouteMode, type RouteMode } from "@/lib/routing"
+import { getOsrmRoute } from "@/lib/osrm-routing"
 
 const ORS_API_KEY = process.env.OPENROUTESERVICE_API_KEY || ""
 
@@ -25,9 +26,8 @@ interface RouteResponse {
 
 const cache = new Map<string, { data: RouteResponse; timestamp: number }>()
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000
-const CACHE_VERSION = "v7"
+const CACHE_VERSION = "v8"
 const ORS_TIMEOUT_MS = 5_000
-const OSRM_TIMEOUT_MS = 4_000
 
 function isCoordinate(value: unknown): value is Coordinate {
     if (!value || typeof value !== "object") return false
@@ -109,46 +109,6 @@ async function getOrsRoute(from: Coordinate, to: Coordinate, mode: RouteMode) {
     }
 }
 
-async function getOsrmRoute(from: Coordinate, to: Coordinate) {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), OSRM_TIMEOUT_MS)
-
-    try {
-        const coordinates = `${from.lng},${from.lat};${to.lng},${to.lat}`
-        const url = new URL(`https://router.project-osrm.org/route/v1/driving/${coordinates}`)
-        url.searchParams.set("overview", "false")
-        url.searchParams.set("steps", "false")
-
-        const response = await fetch(url, {
-            headers: { Accept: "application/json" },
-            cache: "no-store",
-            signal: controller.signal,
-        })
-
-        if (!response.ok) {
-            console.warn("OSRM distance request failed", { status: response.status })
-            return null
-        }
-
-        const data = await response.json()
-        const route = data.code === "Ok" ? data.routes?.[0] : null
-        if (!route || !Number.isFinite(route.distance) || !Number.isFinite(route.duration)) {
-            console.warn("OSRM distance response was incomplete")
-            return null
-        }
-
-        return {
-            distance_m: Math.round(route.distance),
-            duration_s: Math.round(route.duration),
-        }
-    } catch {
-        console.warn("OSRM distance request raised an exception")
-        return null
-    } finally {
-        clearTimeout(timeoutId)
-    }
-}
-
 export async function POST(request: NextRequest) {
     try {
         const body: RouteRequest = await request.json()
@@ -177,7 +137,7 @@ export async function POST(request: NextRequest) {
                 fallback: false,
             }
         } else {
-            const osrmRoute = await getOsrmRoute(from, to)
+            const osrmRoute = await getOsrmRoute(from, to, requestedMode)
             if (osrmRoute) {
                 result = {
                     ...osrmRoute,
