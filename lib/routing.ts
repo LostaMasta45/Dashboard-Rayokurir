@@ -10,10 +10,10 @@ const ORS_PROFILES: Record<RouteMode, string> = {
     car: "driving-car",
 }
 
-export function getOrsRouteOptions(mode: RouteMode) {
-    // Keep the kampung option on the drivable road network while avoiding
-    // motorway-style highways where a local-road alternative exists.
-    return mode === "kampung" ? { avoid_features: ["highways"] } : undefined
+export function getOrsPreference(mode: RouteMode): "shortest" | "recommended" {
+    // Both modes stay on ORS's driving graph. Kampung prioritizes the shortest
+    // driveable route; car keeps the provider's recommended driving route.
+    return mode === "kampung" ? "shortest" : "recommended"
 }
 
 export function parseRouteMode(value: unknown): RouteMode {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getOrsProfile, getOrsRouteOptions, parseRouteMode, type RouteMode } from "@/lib/routing"
+import { getOrsPreference, getOrsProfile, parseRouteMode, type RouteMode } from "@/lib/routing"
 
 const ORS_API_KEY = process.env.OPENROUTESERVICE_API_KEY || ""
 
@@ -25,7 +25,8 @@ interface RouteGeometryResponse {
 
 const cache = new Map<string, { data: RouteGeometryResponse; timestamp: number }>()
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000
-const CACHE_VERSION = "v5"
+const CACHE_VERSION = "v6"
+const ORS_TIMEOUT_MS = 7_000
 
 function isCoordinate(value: unknown): value is Coordinate {
     if (!value || typeof value !== "object") return false
@@ -47,6 +48,9 @@ function haversineDistance(from: Coordinate, to: Coordinate): number {
 async function getOrsGeometry(waypoints: Coordinate[], mode: RouteMode) {
     if (!ORS_API_KEY) return null
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), ORS_TIMEOUT_MS)
+
     try {
         const profile = getOrsProfile(mode)
         const response = await fetch(
@@ -60,8 +64,10 @@ async function getOrsGeometry(waypoints: Coordinate[], mode: RouteMode) {
                 },
                 body: JSON.stringify({
                     coordinates: waypoints.map(({ lat, lng }) => [lng, lat]),
-                    options: getOrsRouteOptions(mode),
+                    preference: getOrsPreference(mode),
                 }),
+                cache: "no-store",
+                signal: controller.signal,
             }
         )
 
@@ -87,6 +93,8 @@ async function getOrsGeometry(waypoints: Coordinate[], mode: RouteMode) {
     } catch {
         console.warn("ORS geometry request raised an exception", { profile: getOrsProfile(mode) })
         return null
+    } finally {
+        clearTimeout(timeoutId)
     }
 }
 

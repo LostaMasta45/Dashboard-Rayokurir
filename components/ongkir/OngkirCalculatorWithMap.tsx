@@ -139,38 +139,41 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
 
         const requestId = ++calculationRequestRef.current
         setStatus("loading")
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 12_000)
 
         try {
             // Calculate D1: Basecamp → Pickup
-            const d1Response = await fetch("/api/route-distance", {
+            const d1Request = fetch("/api/route-distance", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     from: { lat: BASECAMP.lat, lng: BASECAMP.lng },
                     to: { lat: pickup.lat, lng: pickup.lng },
                     routeMode
-                })
+                }),
+                signal: controller.signal,
             })
-            if (!d1Response.ok) throw new Error("Failed to calculate pickup route")
-            const d1Data = await d1Response.json()
-            const d1Km = d1Data.distance_m / 1000
-
             // Calculate D2: Pickup → Dropoff
-            const d2Response = await fetch("/api/route-distance", {
+            const d2Request = fetch("/api/route-distance", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     from: { lat: pickup.lat, lng: pickup.lng },
                     to: { lat: dropoff.lat, lng: dropoff.lng },
                     routeMode
-                })
+                }),
+                signal: controller.signal,
             })
+            const [d1Response, d2Response] = await Promise.all([d1Request, d2Request])
+            if (!d1Response.ok) throw new Error("Failed to calculate pickup route")
             if (!d2Response.ok) throw new Error("Failed to calculate delivery route")
-            const d2Data = await d2Response.json()
+            const [d1Data, d2Data] = await Promise.all([d1Response.json(), d2Response.json()])
             if (!Number.isFinite(d1Data.distance_m) || !Number.isFinite(d2Data.distance_m) || !Number.isFinite(d1Data.duration_s) || !Number.isFinite(d2Data.duration_s)) {
                 throw new Error("Route response was incomplete")
             }
             if (requestId !== calculationRequestRef.current) return
+            const d1Km = d1Data.distance_m / 1000
             const d2Km = d2Data.distance_m / 1000
 
             // Calculate pricing
@@ -199,8 +202,8 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
             console.error("Route calculation error")
 
             // Fallback to Haversine
-            const d1Km = haversineDistance(BASECAMP.lat, BASECAMP.lng, pickup.lat, pickup.lng)
-            const d2Km = haversineDistance(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng)
+            const d1Km = haversineDistance(BASECAMP.lat, BASECAMP.lng, pickup.lat, pickup.lng) * 1.3
+            const d2Km = haversineDistance(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng) * 1.3
             const pricing = calculateOngkir(d1Km, d2Km, isExpress)
             const d1DurationMinutes = Math.round(d1Km * 2)
             const d2DurationMinutes = Math.round(d2Km * 2)
@@ -216,6 +219,8 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                 fallbackNote: "Estimasi jarak sementara digunakan karena rute jalan tidak tersedia."
             })
             setStatus("ready")
+        } finally {
+            clearTimeout(timeoutId)
         }
     }, [pickup, dropoff, isExpress, routeMode])
 

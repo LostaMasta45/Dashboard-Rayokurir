@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getOrsProfile, getOrsRouteOptions, parseRouteMode, type RouteMode } from "@/lib/routing"
+import { getOrsPreference, getOrsProfile, parseRouteMode, type RouteMode } from "@/lib/routing"
 
 const ORS_API_KEY = process.env.OPENROUTESERVICE_API_KEY || ""
 
@@ -25,7 +25,8 @@ interface RouteResponse {
 
 const cache = new Map<string, { data: RouteResponse; timestamp: number }>()
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000
-const CACHE_VERSION = "v5"
+const CACHE_VERSION = "v6"
+const ORS_TIMEOUT_MS = 5_000
 
 function isCoordinate(value: unknown): value is Coordinate {
     if (!value || typeof value !== "object") return false
@@ -47,19 +48,23 @@ function haversineDistance(from: Coordinate, to: Coordinate): number {
 async function getOrsRoute(from: Coordinate, to: Coordinate, mode: RouteMode) {
     if (!ORS_API_KEY) return null
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), ORS_TIMEOUT_MS)
+
     try {
         const profile = getOrsProfile(mode)
-        const response = await fetch(`https://api.openrouteservice.org/v2/directions/${profile}/geojson`, {
-            method: "POST",
+        const url = new URL(`https://api.openrouteservice.org/v2/directions/${profile}`)
+        url.searchParams.set("start", `${from.lng},${from.lat}`)
+        url.searchParams.set("end", `${to.lng},${to.lat}`)
+        url.searchParams.set("preference", getOrsPreference(mode))
+
+        const response = await fetch(url, {
             headers: {
                 Authorization: ORS_API_KEY,
-                "Content-Type": "application/json",
-                Accept: "application/geo+json",
+                Accept: "application/json, application/geo+json",
             },
-            body: JSON.stringify({
-                coordinates: [[from.lng, from.lat], [to.lng, to.lat]],
-                options: getOrsRouteOptions(mode),
-            }),
+            cache: "no-store",
+            signal: controller.signal,
         })
 
         if (!response.ok) {
@@ -81,6 +86,8 @@ async function getOrsRoute(from: Coordinate, to: Coordinate, mode: RouteMode) {
     } catch {
         console.warn("ORS distance request raised an exception", { profile: getOrsProfile(mode) })
         return null
+    } finally {
+        clearTimeout(timeoutId)
     }
 }
 
