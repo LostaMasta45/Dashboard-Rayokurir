@@ -53,19 +53,36 @@ async function getOrsRoute(from: Coordinate, to: Coordinate, mode: RouteMode) {
 
     try {
         const profile = getOrsProfile(mode)
-        const url = new URL(`https://api.openrouteservice.org/v2/directions/${profile}`)
-        url.searchParams.set("start", `${from.lng},${from.lat}`)
-        url.searchParams.set("end", `${to.lng},${to.lat}`)
-        url.searchParams.set("preference", getOrsPreference(mode))
+        const headers = {
+            Authorization: ORS_API_KEY,
+            Accept: "application/json, application/geo+json",
+        }
+        let response: Response
 
-        const response = await fetch(url, {
-            headers: {
-                Authorization: ORS_API_KEY,
-                Accept: "application/json, application/geo+json",
-            },
-            cache: "no-store",
-            signal: controller.signal,
-        })
+        if (mode === "kampung") {
+            response = await fetch(`https://api.openrouteservice.org/v2/directions/${profile}/geojson`, {
+                method: "POST",
+                headers: {
+                    ...headers,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    coordinates: [[from.lng, from.lat], [to.lng, to.lat]],
+                    preference: getOrsPreference(mode),
+                }),
+                cache: "no-store",
+                signal: controller.signal,
+            })
+        } else {
+            const url = new URL(`https://api.openrouteservice.org/v2/directions/${profile}`)
+            url.searchParams.set("start", `${from.lng},${from.lat}`)
+            url.searchParams.set("end", `${to.lng},${to.lat}`)
+            response = await fetch(url, {
+                headers,
+                cache: "no-store",
+                signal: controller.signal,
+            })
+        }
 
         if (!response.ok) {
             console.warn("ORS distance request failed", { profile, status: response.status })
