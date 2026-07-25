@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getOrsProfile, parseRouteMode, type RouteMode } from "@/lib/routing"
+import { getOrsProfile, getOrsRouteOptions, parseRouteMode, type RouteMode } from "@/lib/routing"
 
 const ORS_API_KEY = process.env.OPENROUTESERVICE_API_KEY || ""
 
@@ -25,7 +25,7 @@ interface RouteGeometryResponse {
 
 const cache = new Map<string, { data: RouteGeometryResponse; timestamp: number }>()
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000
-const CACHE_VERSION = "v4"
+const CACHE_VERSION = "v5"
 
 function isCoordinate(value: unknown): value is Coordinate {
     if (!value || typeof value !== "object") return false
@@ -58,7 +58,10 @@ async function getOrsGeometry(waypoints: Coordinate[], mode: RouteMode) {
                     "Content-Type": "application/json",
                     Accept: "application/geo+json",
                 },
-                body: JSON.stringify({ coordinates: waypoints.map(({ lat, lng }) => [lng, lat]) }),
+                body: JSON.stringify({
+                    coordinates: waypoints.map(({ lat, lng }) => [lng, lat]),
+                    options: getOrsRouteOptions(mode),
+                }),
             }
         )
 

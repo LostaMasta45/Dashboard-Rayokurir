@@ -44,7 +44,16 @@ function parseGoogleMapsLink(text: string): { lat: number; lng: number } | null 
     const trimmed = text.trim()
     if (!trimmed.match(/google|maps/i)) return null
 
+    let decoded = trimmed
+    try {
+        decoded = decodeURIComponent(trimmed)
+    } catch {
+        // Keep parsing the original link if it has a malformed escape sequence.
+    }
+
     const patterns = [
+        /[?&](?:query|destination|origin)=(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/,
+        /[?&]ll=(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/,
         // !3d{lat}!4d{lng} — actual place/pin coordinates (most accurate)
         /!3d(-?\d+\.?\d*)!4d(-?\d+\.?\d*)/,
         // ?q=lat,lng — shared location from WhatsApp
@@ -57,7 +66,7 @@ function parseGoogleMapsLink(text: string): { lat: number; lng: number } | null 
         /@(-?\d+\.?\d*),\s*(-?\d+\.?\d*)/,
     ]
     for (const pattern of patterns) {
-        const match = trimmed.match(pattern)
+        const match = decoded.match(pattern)
         if (match) {
             const lat = parseFloat(match[1])
             const lng = parseFloat(match[2])
@@ -281,7 +290,7 @@ export function GoogleMapsLinkInput({ onLocationFound, type = "pickup", classNam
 
             if (!resolved) {
                 setStatus("error")
-                setErrorMsg("Gagal memproses link. Coba paste link lengkap atau koordinat langsung.")
+                setErrorMsg("Link belum terbaca. Pilih titik di peta atau paste koordinat langsung.")
                 if (timeoutRef.current) clearTimeout(timeoutRef.current)
                 timeoutRef.current = setTimeout(() => {
                     setStatus("idle")
@@ -304,7 +313,7 @@ export function GoogleMapsLinkInput({ onLocationFound, type = "pickup", classNam
             }
 
             setStatus("error")
-            setErrorMsg("Link tidak mengandung koordinat. Coba format lain.")
+            setErrorMsg("Link belum memuat koordinat. Pilih titik di peta atau paste koordinat langsung.")
             if (timeoutRef.current) clearTimeout(timeoutRef.current)
             timeoutRef.current = setTimeout(() => {
                 setStatus("idle")
@@ -317,7 +326,7 @@ export function GoogleMapsLinkInput({ onLocationFound, type = "pickup", classNam
         const coords = parseLocation(trimmed)
         if (!coords) {
             setStatus("error")
-            setErrorMsg("Format tidak dikenali. Paste link Maps, koordinat, atau share location.")
+            setErrorMsg("Format belum dikenali. Paste link Maps, koordinat, atau share location.")
             if (timeoutRef.current) clearTimeout(timeoutRef.current)
             timeoutRef.current = setTimeout(() => {
                 setStatus("idle")
@@ -429,7 +438,7 @@ export function GoogleMapsLinkInput({ onLocationFound, type = "pickup", classNam
                         onChange={(e) => setLinkValue(e.target.value)}
                         onPaste={handlePaste}
                         onKeyDown={handleKeyDown}
-                        placeholder="Paste link Maps / koordinat / share location..."
+                        placeholder="Paste link lokasi / koordinat / share location..."
                         disabled={status === "loading"}
                         className="flex-1 bg-transparent border-none outline-none text-xs text-gray-700 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-500 disabled:opacity-50"
                     />

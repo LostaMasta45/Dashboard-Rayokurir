@@ -63,6 +63,40 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
     const geocodeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const calculationRequestRef = useRef(0)
 
+    // A fixed modal can still let the page behind it move on mobile Safari.
+    // Lock the document while the Leaflet map continues to receive its drags.
+    useEffect(() => {
+        if (!selectingMode || typeof window === "undefined") return
+
+        const scrollY = window.scrollY
+        const { body, documentElement } = document
+        const previousBodyStyle = {
+            overflow: body.style.overflow,
+            position: body.style.position,
+            top: body.style.top,
+            width: body.style.width,
+            touchAction: body.style.touchAction,
+        }
+        const previousDocumentOverflow = documentElement.style.overflow
+
+        body.style.overflow = "hidden"
+        body.style.position = "fixed"
+        body.style.top = `-${scrollY}px`
+        body.style.width = "100%"
+        body.style.touchAction = "none"
+        documentElement.style.overflow = "hidden"
+
+        return () => {
+            body.style.overflow = previousBodyStyle.overflow
+            body.style.position = previousBodyStyle.position
+            body.style.top = previousBodyStyle.top
+            body.style.width = previousBodyStyle.width
+            body.style.touchAction = previousBodyStyle.touchAction
+            documentElement.style.overflow = previousDocumentOverflow
+            window.scrollTo(0, scrollY)
+        }
+    }, [selectingMode])
+
     // Load from URL params on mount
     useEffect(() => {
         if (typeof window === "undefined") return
@@ -376,20 +410,14 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
 
         if (selectingMode === "pickup") {
             setPickup({ ...tempLocation, id: `picked-pickup-${Date.now()}` })
-            if (!dropoff) {
-                setTimeout(() => {
-                    openSelectionMode("dropoff")
-                }, 100)
-            } else {
-                setSelectingMode(null)
-                window.history.back()
-            }
         } else {
             setDropoff({ ...tempLocation, id: `picked-dropoff-${Date.now()}` })
-            setSelectingMode(null)
-            window.history.back()
         }
         setTempLocation(null)
+        // Return to the form after every confirmation. The admin can then
+        // choose the destination via map or Paste link, without being forced
+        // into a second map selection.
+        closeSelectionMode()
     }
 
     // GPS Handler for Map Modal
@@ -489,8 +517,6 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
 
                     {/* Inputs */}
                     <div className="space-y-4 relative">
-                        {/* Connecting Line */}
-                        <div className="absolute left-[26px] top-10 bottom-10 w-0.5 bg-gray-300 dark:bg-gray-700 border-l border-dashed border-transparent pointer-events-none hidden md:block" />
 
                         {/* Pickup Location */}
                         <div className="space-y-2">
@@ -914,7 +940,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: "100%" }}
                         transition={{ duration: 0.3, ease: "circOut" }}
-                        className="fixed inset-0 z-[9999] bg-slate-100 dark:bg-gray-950 flex flex-col overflow-hidden"
+                        className="fixed inset-0 z-[9999] bg-slate-100 dark:bg-gray-950 flex flex-col overflow-hidden overscroll-none"
                     >
                         {/* Header Bar */}
                         <div className="absolute top-0 inset-x-0 z-[10000] pointer-events-none" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
@@ -940,7 +966,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                         {/* Map */}
                         <div className="flex-1 relative bg-slate-100 dark:bg-gray-950 min-h-0">
                             {tempLocation && (
-                                <div className="absolute inset-0">
+                                <div className="absolute inset-0 touch-none overscroll-none">
                                     <MapPicker
                                         pickup={selectingMode === 'pickup' ? tempLocation : null}
                                         dropoff={selectingMode === 'dropoff' ? tempLocation : null}
@@ -997,7 +1023,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                                 <Button
                                     onClick={confirmSelection}
                                     className={cn(
-                                        "min-h-14 sm:min-h-16 w-full rounded-2xl text-sm sm:text-base font-extrabold shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2",
+                                        "min-h-14 sm:min-h-16 w-full touch-manipulation rounded-2xl text-sm sm:text-base font-extrabold shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2",
                                         selectingMode === 'pickup'
                                             ? "bg-teal-600 hover:bg-teal-700 text-white shadow-teal-500/30"
                                             : "bg-orange-600 hover:bg-orange-700 text-white shadow-orange-500/30"

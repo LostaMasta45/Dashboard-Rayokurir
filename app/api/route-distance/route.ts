@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getOrsProfile, parseRouteMode, type RouteMode } from "@/lib/routing"
+import { getOrsProfile, getOrsRouteOptions, parseRouteMode, type RouteMode } from "@/lib/routing"
 
 const ORS_API_KEY = process.env.OPENROUTESERVICE_API_KEY || ""
 
@@ -25,7 +25,7 @@ interface RouteResponse {
 
 const cache = new Map<string, { data: RouteResponse; timestamp: number }>()
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000
-const CACHE_VERSION = "v4"
+const CACHE_VERSION = "v5"
 
 function isCoordinate(value: unknown): value is Coordinate {
     if (!value || typeof value !== "object") return false
@@ -49,15 +49,18 @@ async function getOrsRoute(from: Coordinate, to: Coordinate, mode: RouteMode) {
 
     try {
         const profile = getOrsProfile(mode)
-        const response = await fetch(
-            `https://api.openrouteservice.org/v2/directions/${profile}?start=${from.lng},${from.lat}&end=${to.lng},${to.lat}`,
-            {
-                headers: {
-                    Authorization: ORS_API_KEY,
-                    Accept: "application/json, application/geo+json",
-                },
-            }
-        )
+        const response = await fetch(`https://api.openrouteservice.org/v2/directions/${profile}/geojson`, {
+            method: "POST",
+            headers: {
+                Authorization: ORS_API_KEY,
+                "Content-Type": "application/json",
+                Accept: "application/geo+json",
+            },
+            body: JSON.stringify({
+                coordinates: [[from.lng, from.lat], [to.lng, to.lat]],
+                options: getOrsRouteOptions(mode),
+            }),
+        })
 
         if (!response.ok) {
             console.warn("ORS distance request failed", { profile, status: response.status })

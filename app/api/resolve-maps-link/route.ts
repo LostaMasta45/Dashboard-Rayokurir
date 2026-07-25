@@ -27,42 +27,9 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Follow redirects manually to get the final URL
-        // Using redirect: "manual" to capture the Location header
+        // A short Maps link can pass through several Google redirects before
+        // reaching the final URL that contains the shared pin.
         const response = await fetch(trimmed, {
-            method: "GET",
-            redirect: "manual",
-            headers: {
-                "User-Agent": "Mozilla/5.0 (compatible; bot)",
-            },
-        })
-
-        // Check for redirect (301, 302, 307, 308)
-        if ([301, 302, 307, 308].includes(response.status)) {
-            const location = response.headers.get("location")
-            if (location) {
-                // Sometimes there's a second redirect, follow it too
-                const response2 = await fetch(location, {
-                    method: "GET",
-                    redirect: "manual",
-                    headers: {
-                        "User-Agent": "Mozilla/5.0 (compatible; bot)",
-                    },
-                })
-
-                if ([301, 302, 307, 308].includes(response2.status)) {
-                    const location2 = response2.headers.get("location")
-                    if (location2) {
-                        return NextResponse.json({ resolvedUrl: location2 })
-                    }
-                }
-
-                return NextResponse.json({ resolvedUrl: location })
-            }
-        }
-
-        // If no redirect, try following with redirect: "follow" to get the final URL
-        const followResponse = await fetch(trimmed, {
             method: "GET",
             redirect: "follow",
             headers: {
@@ -70,7 +37,11 @@ export async function POST(request: NextRequest) {
             },
         })
 
-        return NextResponse.json({ resolvedUrl: followResponse.url })
+        if (!response.ok) {
+            return NextResponse.json({ error: "Failed to resolve link" }, { status: 422 })
+        }
+
+        return NextResponse.json({ resolvedUrl: response.url })
     } catch (error) {
         console.error("Error resolving Maps link:", error)
         return NextResponse.json(

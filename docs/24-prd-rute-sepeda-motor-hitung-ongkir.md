@@ -1,221 +1,197 @@
-# PRD — Mode Rute Sepeda Motor di Kalkulator Ongkir
+# PRD — Google Maps untuk Pilih Lokasi dan Cari Tempat di Hitung Ongkir
 
-**Status:** Usulan untuk ditinjau (belum diimplementasikan)  
-**Tanggal:** 24 Juli 2026  
-**Pemilik:** Rayo Kurir  
-**Permukaan terdampak:** `/hitungongkir`, kalkulator pada landing page, API perhitungan rute, tampilan garis rute peta, dan tautan bagikan.
+**Status:** Usulan implementasi — menunggu persetujuan billing dan API key Google Maps Platform
 
-## 1. Ringkasan keputusan yang diusulkan
+**Tanggal:** 24 Juli 2026
 
-Tambahkan pemilih **Pilihan rute** dengan dua opsi yang seluruhnya memakai OpenRouteService (ORS) yang sudah digunakan sekarang:
+**Pemilik:** Rayo Kurir
 
-- **Jalan kampung / motor — estimasi**: memakai profil ORS `cycling-regular` untuk mencari alternatif jalur lokal yang kadang lebih dekat untuk motor.
-- **Jalan mobil**: memakai profil ORS `driving-car` seperti hasil sekarang.
+**Permukaan terdampak:** `/hitungongkir`, kalkulator landing page, pemilih lokasi mobile, Google Maps link dari WhatsApp, Vercel environment, serta halaman Kebijakan Privasi/Ketentuan Penggunaan.
 
-Tidak ada Google API, billing baru, atau provider baru. ORS `cycling-regular` bukan profil motor resmi, sehingga istilah UI **tidak boleh** menjanjikan "rute motor pasti bisa". Ia hanya menjadi estimasi jalur lokal/alternatif yang harus tetap dicek kurir di lapangan. Rute Mobil selalu tersedia sebagai pembanding dan fallback.
+## 1. Keputusan utama
 
-## 2. Masalah dan bukti kondisi saat ini
+Tujuan utama **bukan mengganti mesin rute**. Perhitungan jarak dan toggle rute yang sudah berjalan tetap memakai OpenRouteService (ORS):
 
-Kalkulator sekarang menghitung perjalanan dari basecamp dengan dua kaki:
+- `kampung` → ORS `cycling-regular` sebagai estimasi jalur lokal.
+- `car` → ORS `driving-car` sebagai pembanding jalur mobil.
 
-1. D1: basecamp → titik jemput.
-2. D2: titik jemput → titik antar.
+Google Maps Platform hanya digunakan untuk pengalaman pemilihan lokasi:
 
-Kedua perhitungan ongkir memanggil `POST /api/route-distance`. Endpoint tersebut memanggil ORS pada profil `driving-car`. Garis peta dari `POST /api/route-geometry` juga memakai `driving-car`. Karena itu, rute dan angka yang muncul mengikuti batasan mobil, sehingga beberapa gang/jalan lokal yang dapat dilalui motor tidak dipilih dan jarak dapat lebih jauh daripada praktik kurir.
+1. **Google Map yang lebih familiar dan detail** untuk melihat pin/jalan/lokasi.
+2. **Pencarian nama tempat** seperti warung, toko, gedung, sekolah, atau nama bangunan.
+3. **Kesesuaian dengan tautan lokasi Google Maps dari WhatsApp**, selain tetap bisa memilih titik manual.
 
-Jika ORS tidak tersedia, sistem menghitung garis lurus + faktor 30%, tetapi hasilnya saat ini tidak diberi penanda yang jelas kepada pelanggan. Cache rute juga belum memiliki dimensi mode kendaraan karena memang baru ada satu mode.
+Konsekuensinya, Google **Routes API tidak diaktifkan**. Tidak ada biaya/risiko kuota rute motor Google dan tidak ada perubahan rumus ongkir atau rute ORS yang sudah bagus.
 
-## 3. Tujuan dan ukuran keberhasilan
+## 2. Masalah yang diselesaikan
 
-### Tujuan
+Peta sekarang cukup untuk memilih titik, tetapi pengguna/admin lebih sering mengenali lokasi dari nama tempat atau tautan WhatsApp daripada alamat formal. Contoh: `Warung Bu Ani`, `Masjid Desa`, `Alfamart Sumobito`, atau nama gedung.
 
-- Menyediakan estimasi alternatif jalan kampung yang berpotensi lebih dekat untuk kurir motor di Sumobito dan sekitarnya.
-- Mempertahankan rute Mobil sehingga admin/pelanggan dapat membandingkan ketika jalan lokal diragukan atau tidak layak.
-- Mempertahankan dasar perhitungan: **Basecamp → Jemput → Antar**. Toggle tidak pernah mengubah basecamp, urutan kaki perjalanan, maupun skema biaya.
-- Menjaga tarif tier, paket layanan, halaman, dan konfigurasi yang sudah ada.
-- Menampilkan keandalan estimasi dengan jujur; tidak mengklaim jalur lokal selalu dapat dilalui motor.
+Memaksa pengguna menggeser peta untuk setiap lokasi menyulitkan di mobile. Di sisi lain, kolom pencarian permanen membuat form penuh dan keyboard menutup peta. Pengguna sebelumnya juga meminta form tetap sederhana: pilih peta atau tempel link.
 
-### Ukuran keberhasilan setelah rilis
+## 3. Solusi UX yang direkomendasikan
 
-- Pada kumpulan minimal 10 rute uji lokal (termasuk jalan pintas yang diketahui kurir), opsi Jalan kampung menghasilkan rute yang layak ditinjau dan, pada kasus yang sesuai, jaraknya lebih pendek dari Mobil.
-- Tidak ada hasil cache Mobil yang muncul saat Jalan kampung dipilih, dan sebaliknya.
-- Jarak angka ongkir dan garis rute pada peta memakai mode yang sama.
-- Tidak ada secret ORS, koordinat lengkap pelanggan, atau URL berisi key yang tercatat dalam log aplikasi.
-- Persentase fallback, error, dan kuota ORS dapat dipantau per hari.
+Gunakan tiga aksi yang setara untuk tiap titik: **Jemput** dan **Tujuan**.
 
-## 4. Kondisi sekarang vs target
-
-| Aspek | Sekarang | Target |
+| Aksi | Kapan dipakai | Hasil |
 | --- | --- | --- |
-| Profil rute | ORS `driving-car` untuk semua kalkulasi dan peta | ORS `cycling-regular` untuk estimasi Jalan kampung atau `driving-car` untuk Jalan mobil |
-| Jalan kampung yang hanya cocok motor | Sering dihindari karena dimodelkan sebagai mobil | Dapat muncul sebagai estimasi, tetapi perlu validasi kurir karena profilnya sepeda kayuh |
-| Kontrol pengguna | Tidak ada | Segmented toggle: Jalan kampung (estimasi) / Jalan mobil |
-| Konsistensi angka–peta | Satu profil mobil | Satu `routeMode` dikirim untuk D1 Basecamp→Jemput, D2 Jemput→Antar, dan geometri peta |
-| Kegagalan provider | Haversine × 1,3 tanpa label hasil | Status eksplisit: rute Jalan kampung gagal dan fallback Mobil/Haversine yang dipakai |
-| Berbagi estimasi | Titik dan Express dibawa URL | Tambahkan `route_mode`; penerima melihat mode yang sama |
+| **Pilih di peta** | Lokasi tidak muncul pada pencarian atau perlu titik sangat presisi | Google Map layar penuh, pin tetap di tengah, CTA tetap di bawah layar |
+| **Cari nama tempat** | Pengguna tahu nama warung/toko/gedung | Bottom sheet khusus pencarian Google Places, lalu peta memusat ke hasil |
+| **Tempel link** | Lokasi dibagikan dari WhatsApp/Google Maps | Parser mengambil koordinat, lalu peta menampilkan pin untuk konfirmasi |
 
-### Kelebihan dan konsekuensi
+### Alur mobile terbaik
 
-| Opsi | Kelebihan | Konsekuensi |
-| --- | --- | --- |
-| Tetap Mobil saja | Tanpa biaya/provider baru | Estimasi gang motor tetap bisa lebih jauh dari kenyataan |
-| Mengganti semua ke Jalan kampung | Berpotensi lebih dekat | Berisiko melewati akses yang tidak layak untuk motor dan menghilangkan pembanding |
-| **Toggle Jalan kampung + Mobil (usulan)** | Tetap gratis, transparan, admin/pelanggan dapat membandingkan | Jalan kampung adalah estimasi berbasis profil sepeda kayuh, bukan navigasi motor resmi |
-| Provider Google Motor | Profil motor resmi | Tidak dipilih karena membutuhkan billing dan biaya request |
+1. Pengguna menekan salah satu dari tiga tombol di atas, bukan langsung membuka map yang sulit ditutup.
+2. Untuk **Cari nama tempat**, buka layar/bottom sheet fokus dengan input Google autocomplete dan tombol kembali. Input ini tidak tampil permanen di form utama.
+3. Saat hasil dipilih, sheet ditutup dan Google Map dipusatkan ke titik tersebut.
+4. Tampilkan pin tengah dan panel bawah tetap: `Gunakan titik jemput ini` atau `Gunakan tujuan ini`.
+5. Pengguna dapat menggeser/zoom peta tanpa menggeser halaman; hanya panel CTA yang menerima tap.
+6. Setelah titik dikonfirmasi, kembali ke form dan tampilkan ringkasan nama/koordinat singkat serta tombol `Ubah`.
 
-## 5. Pengguna dan alur pengalaman
+Ini menyelesaikan masalah scroll map, tanpa mengorbankan kemampuan pencarian. Google sendiri menyatakan Place Autocomplete widget mendukung mobile, aksesibilitas, dan keyboard/screen reader dengan baik.
 
-### Pelanggan
+## 4. Penyedia dan batasan biaya
 
-1. Memilih titik jemput dan titik antar seperti saat ini.
-2. Sebelum/ketika kalkulasi, memilih `Jalan kampung` atau `Jalan mobil`; nilai awalnya **Jalan kampung — estimasi untuk kurir motor**.
-3. Aplikasi memuat ulang D1, D2, total, durasi, dan polyline peta dengan mode yang sama.
-4. Kartu hasil menyebutkan, misalnya, `Estimasi jalur kampung — cek akses kurir` atau `Estimasi rute mobil`.
-5. Bila ingin mengecek jalan utama, pelanggan dapat beralih ke Mobil; kedua mode tetap hanya estimasi dan harga akhir dikonfirmasi admin.
-6. Link Share menyertakan mode; orang yang membuka link mendapatkan hasil dengan mode yang sama.
+| Kebutuhan | Produk Google | Dipakai? | Batas gratis/bulan | Estimasi awal |
+| --- | --- | --- | ---: | ---: |
+| Basemap/pin/interaksi peta | Maps JavaScript API — Dynamic Maps | Ya | 10.000 map load | ±1.350 load |
+| Saran nama tempat | Places API (New) — Autocomplete | Ya | 10.000 event | ±900 sesi lokasi dipilih |
+| Detail minimal lokasi | Place Details Essentials | Ya | 10.000 request | ±900 request |
+| Rute kendaraan | Routes API | **Tidak** | — | 0 |
+| Geocoding/Text Search/Nearby Search | API lain | **Tidak** | — | 0 |
 
-### Admin/kurir
+Asumsi konservatif: 15 kalkulasi/hari × 30 hari × dua titik = 900 pemilihan lokasi/bulan. Bila setiap kalkulasi membuka peta hasil sekali, total map load kira-kira 1.350/bulan. Angka ini jauh di bawah batas gratis 10.000 untuk masing-masing SKU di atas.
 
-- Tidak ada perubahan format order atau tarif tier pada tahap ini.
-- Admin tetap berwenang mengoreksi estimasi bila jalan tertutup, tidak aman, tidak dapat dilalui motor, atau pin lokasi salah.
-- Tahap lanjutan (di luar PRD ini): tombol internal untuk melaporkan jalan/pin yang tidak akurat agar menjadi data evaluasi, bukan pengubahan rute otomatis oleh pelanggan.
+Autocomplete harus memakai widget Google resmi berbasis sesi. Widget menangani session token sendiri; setelah pengguna memilih tempat, aplikasi hanya meminta field minimum `location`, `displayName`, dan `formattedAddress`. Jangan memakai Text Search, Nearby Search, atau Geocoding sebagai pengganti autocomplete karena tidak dibutuhkan dan menambah biaya.
+
+Billing Google Cloud tetap wajib diaktifkan meski perkiraan pemakaian Rp0. Kuota gratis berlaku per SKU dan diakumulasikan untuk semua project yang terhubung ke billing account yang sama.
+
+## 5. Batasan produk dan data
+
+- **ORS tetap sumber angka ongkir dan garis rute saat ini.** Tidak ada pemanggilan Google Routes API.
+- Google Map dipakai sebagai peta pemilih titik dan peta konteks. Bila garis ORS tetap ditampilkan di atasnya, garis itu harus jelas diberi label `Estimasi rute ORS`, bukan diklaim sebagai arah Google Maps. Sebelum rilis, lakukan review kebijakan Google Maps untuk tampilan konten non-Google pada peta.
+- Alternatif paling aman dan hemat: pada peta Google hasil, tampilkan hanya marker Basecamp/Jemput/Tujuan + total ongkir ORS; sediakan tombol **Buka navigasi di Google Maps** yang membuat Maps URL. Ini tidak memakai Routes API dan tidak menjanjikan garis navigasi Google di aplikasi.
+- Pencarian dibatasi negara Indonesia dan diberi bias di sekitar area layanan/basecamp atau viewport peta terakhir. Bias bukan blokir keras, agar lokasi pelanggan di luar area tetap bisa dipilih.
+- Jangan simpan cache hasil autocomplete/place detail atau daftar tempat. Gunakan data hanya untuk sesi pemilihan lokasi. Titik yang sudah pengguna konfirmasi tetap mengikuti kebijakan penyimpanan order yang ada.
+- Hindari menampilkan pencarian Google sebagai kolom form biasa. Ia hanya dibuka lewat tombol **Cari nama tempat**.
 
 ## 6. Persyaratan fungsional
 
-### 6.1 Pemilih mode
+### 6.1 Google Map
 
-- Tampilkan label `Pilihan rute` dekat area peta/form lokasi, bukan pada toggle Express.
-- Pilihan: `Jalan kampung (estimasi)` dan `Jalan mobil` dengan ikon motor/mobil serta status aksesibel (`radio` atau `radiogroup`, bukan sekadar dekorasi).
-- Default: `kampung`. Jika pengguna membuka link lama tanpa parameter, gunakan default ini; seluruh halaman dan tarif lain tetap sama.
-- Saat mode berubah setelah titik lengkap, batalkan/abaikan respons lama dan hitung ulang. Selama memuat, tampilkan `Menghitung jalur kampung…` atau `Menghitung rute mobil…`.
-- Sertakan `route_mode=kampung|car` pada URL share. Parameter tidak valid kembali ke default aman `kampung`.
+- Ganti basemap Leaflet/OSM pada pemilih lokasi menjadi Maps JavaScript API.
+- Tampilkan marker/pin jelas, tombol lokasi saya, zoom controls, dan atribusi Google yang tidak tertutup CTA.
+- Tetap gunakan pola satu layar di mobile: container fixed, tidak ada halaman yang dapat di-scroll ketika map picker terbuka, dan CTA berada sebagai dock bawah `pointer-events: auto`.
+- Lazy-load peta hanya ketika pengguna menekan `Pilih di peta`, membuka hasil pilihan, atau memilih hasil pencarian. Jangan me-mount map tersembunyi di semua form.
+- Reuse instance peta selama satu modal/sesi untuk menghindari map load berulang.
 
-### 6.2 Kontrak API internal
+### 6.2 Cari nama tempat
 
-Tambahkan parameter wajib `routeMode` pada kedua API:
+- Tambahkan tombol `Cari nama tempat` dengan ikon pencarian pada kartu Jemput dan Tujuan.
+- Gunakan `PlaceAutocompleteElement` dari Maps JavaScript Places library (Places API New), bukan endpoint search buatan sendiri.
+- Placeholder: `Cari warung, toko, gedung, atau alamat`.
+- Minta hanya `location`, `displayName`, dan `formattedAddress` setelah pengguna benar-benar memilih hasil.
+- Terapkan `componentRestrictions` Indonesia dan `locationBias` sekitar basecamp/viewport, kemudian perbarui bias ketika pengguna menggeser peta.
+- Hanya hasil pilihan pengguna yang mengubah pin. Mengetik kata kunci tidak boleh menghitung ongkir atau memanggil ORS.
+- Jika tidak ada hasil, pengguna dapat kembali ke `Pilih di peta` atau `Tempel link`; jangan otomatis melakukan Text Search atau Geocoding.
 
-```json
-{ "from": { "lat": -7.520653, "lng": 112.343111 }, "to": { "lat": -7.52, "lng": 112.35 }, "routeMode": "kampung" }
+### 6.3 Tautan dari WhatsApp
+
+- Pertahankan tombol `Tempel link` yang sudah ada.
+- Terima tautan Google Maps lengkap atau short link yang berhasil diekspansi parser yang ada, lalu ambil koordinat dan tampilkan konfirmasi pin di Google Map.
+- Jika tautan tidak memuat/menyelesaikan koordinat, tampilkan error yang dapat ditindaklanjuti: `Link belum terbaca. Pilih titik di peta atau cari nama tempat.`
+- Tempel link tidak memanggil Places API jika koordinat sudah ditemukan.
+
+### 6.4 Perhitungan ongkir
+
+- Jangan mengubah kontrak ORS, toggle `kampung|car`, basecamp, rumus tarif, minimum ongkir Rp3.000, Express, paket tes, atau share parameter rute yang sudah berjalan.
+- Rute dihitung hanya sesudah titik jemput dan tujuan dikonfirmasi, seperti perilaku sekarang.
+- Map picker tidak boleh memicu hitung rute saat peta digeser atau autocomplete sedang menampilkan saran.
+
+## 7. Keamanan, privasi, dan biaya
+
+Gunakan **satu browser key Google** karena seluruh penggunaan Google terjadi di browser. API key browser bukan rahasia absolut; perlindungannya adalah restriction yang tepat.
+
+```dotenv
+# Boleh di browser, tetapi dibatasi domain dan API.
+NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY=
 ```
 
-dan:
+- Restrict key ke HTTP referrer produksi: `https://rayokurir.id/*` dan `https://www.rayokurir.id/*`.
+- Restrict key ke **Maps JavaScript API** dan **Places API (New)** saja.
+- Tidak perlu `GOOGLE_MAPS_ROUTES_API_KEY`, karena Routes API tidak dipakai.
+- Jangan memasukkan key ke source code, link share, log, screenshot, atau dokumentasi publik.
+- Buat budget alert US$5/bulan pada 50%, 90%, dan 100%. Alert bukan pemutus request; pantau quota/usage juga.
+- Catat hanya metrik agregat: tombol pemilih yang dipakai (`map|place_search|link`), sukses/gagal parser, dan jumlah request. Jangan log kata kunci tempat, alamat lengkap, URL WhatsApp/Maps, atau koordinat mentah.
+- Sebelum live, pastikan Kebijakan Privasi dan Ketentuan Penggunaan yang publik memenuhi kebijakan/atribusi Google Maps Platform.
 
-```json
-{ "waypoints": [{ "lat": -7.520653, "lng": 112.343111 }], "routeMode": "car" }
-```
+## 8. Desain teknis
 
-Respons harus menambahkan metadata tanpa mengekspos secret:
-
-```json
-{
-  "distance_m": 3120,
-  "duration_s": 540,
-  "coordinates": [],
-  "route_mode": "kampung",
-  "provider": "ors",
-  "fallback": false
-}
-```
-
-- Validasi koordinat menerima nilai `0`; jangan memakai pemeriksaan truthy yang menolak koordinat lintang/bujur nol.
-- Kedua endpoint wajib memvalidasi mode dengan allow-list `kampung|car`; jangan menjadikan nama profil provider sebagai input publik.
-
-### 6.3 Penyedia rute
-
-- **Jalan kampung:** panggil ORS dengan profil `cycling-regular` yang sudah tersedia pada konfigurasi sekarang.
-- **Jalan mobil:** pertahankan ORS `driving-car` yang ada.
-- Gunakan key `OPENROUTESERVICE_API_KEY` yang sudah ada. Tidak ada key Google, perubahan billing, maupun provider baru.
-- Pertahankan geocoding dan picker peta yang ada; perubahan hanya memilih profil directions ORS.
-- Gunakan fungsi pemilih profil server-side agar nilai input publik hanya `kampung|car`, bukan nama profil ORS bebas.
-
-### 6.4 Harga, tampilan, dan fallback
-
-- Rumus `calculateD1`, `calculateD2`, minimum ongkir Rp3.000, Express, serta seluruh paket yang sudah ada **tidak diubah**. Yang berubah hanya input kilometer dan durasi.
-- Jika ORS Jalan kampung gagal, jangan diam-diam memakai Mobil sambil menampilkan label Jalan kampung. Tampilkan status `Jalur kampung sementara belum tersedia; estimasi memakai rute mobil` dan metadata `fallback: true`.
-- Jika kedua provider tidak tersedia, gunakan fallback Haversine yang ada tetapi beri label `Estimasi jarak sementara`, tanpa polyline jalan palsu. Harga akhir tetap konfirmasi admin.
-- Tambahkan teks wajib/terlihat di hasil Jalan kampung: `Jalur kampung adalah estimasi data peta; cek kondisi, akses, dan keamanan jalan di lapangan.` Profil ini dibuat untuk sepeda kayuh dan bukan jaminan akses motor.
-
-### 6.5 Cache, privasi, dan observabilitas
-
-- Cache key harus memuat `routeMode`, nama provider, dan versi, misalnya `v4|ors|kampung|lat,lng|lat,lng`; cache Mobil dan Jalan kampung tidak boleh saling berbagi.
-- Cache polyline dan distance memakai mode/provider yang sama dan TTL yang konsisten. Pada Vercel, cache memori per instance bukan cache bersama; anggap sebagai optimasi, bukan jaminan.
-- Catat metrik agregat: mode, provider, `success|fallback|error`, latency, dan jarak yang dibulatkan/kelompokkan. Jangan mencatat API key, alamat pelanggan, URL maps, atau koordinat mentah. Hapus log debug saat ini yang mencetak URL ORS/koordinat.
-- Pantau quota ORS dan jumlah fallback/error sebelum dan sesudah rilis. Tidak ada billing maupun API key baru pada perubahan ini.
-
-## 7. Desain teknis yang terdampak
-
-| Area | Perubahan yang diperlukan |
+| Area | Perubahan |
 | --- | --- |
-| `components/ongkir/OngkirCalculatorWithMap.tsx` | State `routeMode`, toggle, copy/status, request D1–D2, URL share, dan proteksi respons balapan |
-| `components/ongkir/MapPicker.tsx` | Teruskan `routeMode` ke geometri; beri label/warna sesuai mode bila diperlukan |
-| `app/api/route-distance/route.ts` | Allow-list mode, pemilih profil ORS Kampung/Mobil, response metadata, cache key aman, fallback berlabel |
-| `app/api/route-geometry/route.ts` | Pemilih profil ORS yang sama untuk polyline multi-waypoint, cache key aman, tanpa log koordinat |
-| Environment Vercel | Tidak ada variabel baru; gunakan `OPENROUTESERVICE_API_KEY` yang telah ada |
-| Tes | Unit test mapper response, cache key, fallback, dan smoke test rute nyata |
+| `components/ongkir/MapPicker.tsx` | Integrasi Maps JavaScript API, map fullscreen mobile, pin tengah, dock CTA, location bias, lazy load |
+| Komponen baru `PlaceSearchSheet.tsx` | Place Autocomplete widget, state hasil sementara, detail field minimum, aksesibilitas/focus management |
+| `components/ongkir/OngkirCalculatorWithMap.tsx` | Tambah tombol Cari nama tempat, buka/tutup sheet, simpan hasil yang sudah dikonfirmasi; rumus ORS tidak diubah |
+| Parser link yang ada | Pertahankan parsing Google Maps link; hanya tambah pesan fallback dan konfirmasi peta bila perlu |
+| `lib/routing.ts`, API ORS | Tidak diubah kecuali penyesuaian kecil type/UI bila diperlukan |
+| Environment Vercel | Tambah `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY` di Preview/Production |
+| Legal pages | Audit Terms/Privacy dan atribusi sebelum rilis |
 
-Catatan implementasi: lebih baik buat satu modul server, misalnya `lib/routing/`, yang menerima `RouteMode` dan mengembalikan struktur normalisasi. Jangan menduplikasi keputusan provider di dua endpoint.
+## 9. Rencana uji dan rilis
 
-## 8. Di luar cakupan
+### Tahap 1 — Peta tanpa pencarian
 
-- Mengubah tarif/tier, biaya Express, paket tes, atau aturan admin.
-- Memberi jaminan bahwa setiap gang bisa dilalui motor.
-- Menavigasikan kurir secara turn-by-turn dari aplikasi.
-- Membangun database jalan pintas manual atau izin akses per RT (dapat menjadi fase lanjutan setelah data laporan cukup).
-- Mengganti peta Leaflet, geocoding ORS, atau seluruh provider rute Mobil pada rilis ini.
+- Aktifkan Maps JavaScript API pada map picker dengan key referrer-restricted.
+- Uji mobile kecil: peta dapat digeser, CTA selalu terlihat, halaman belakang tidak bergerak, dan tombol dapat diketuk.
+- Uji paste link WhatsApp/Google Maps dan konfirmasi pin.
 
-## 9. Risiko dan mitigasi
+### Tahap 2 — Pencarian tempat
 
-| Risiko | Dampak | Mitigasi |
-| --- | --- | --- |
-| Data peta belum mengenali gang motor | Jalur kampung masih bisa memutar atau memilih jalan yang tidak ideal | Uji rute lokal, tampilkan disclaimer, sediakan Mobil, dan jadikan admin penentu akhir |
-| Jalan mungkin legal namun tidak aman/terhalang | Waktu dan ongkir aktual berbeda | Jangan menjanjikan akses; gunakan status estimasi dan catatan admin |
-| Profil `cycling-regular` bukan motor resmi | Bisa merekomendasikan akses sepeda/pejalan kaki yang tidak cocok | Labelkan sebagai estimasi jalur kampung, review rute lokal, dan sediakan Mobil |
-| Cache/rute/angka beda mode | Harga membingungkan | Mode wajib di request/response/cache/share link; test kontrak end-to-end |
-| API gagal lalu diam-diam berganti profil | Pelanggan salah memahami estimasi | Metadata provider/fallback dan pesan UI eksplisit |
+- Aktifkan Places API (New) dan autocomplete sheet.
+- Uji nama warung/toko/gedung, alamat umum, hasil yang tidak ada, keyboard, dan screen reader.
+- Pastikan memilih hasil tidak menghitung ongkir sebelum CTA konfirmasi ditekan.
 
-## 10. Rencana rilis dan pengujian
+### Tahap 3 — Kontrol biaya dan rollout
 
-### Tahap 0 — Persiapan
+- Aktifkan budget alert serta review quota sebelum deploy production.
+- Pantau 7 hari: Dynamic Maps loads, Autocomplete, Place Details Essentials, error rate, dan pola klik map/search/link.
+- Jika pemakaian mendekati 70% dari free cap, matikan pencarian sementara via feature flag dan pertahankan pilih peta/paste link.
 
-- Buat daftar 10–15 pasangan titik uji yang disetujui kurir: jalan utama, gang motor, jalan buntu, titik dekat, dan lintas desa.
-- Tentukan satu contoh nyata yang dilaporkan pengguna sebagai acceptance route utama.
+## 10. Kriteria penerimaan
 
-### Tahap 1 — Implementasi dan preview
+- [ ] ORS `kampung`/`car` dan tarif saat ini tetap bekerja tanpa perubahan logika.
+- [ ] Google Routes API tidak diaktifkan dan tidak ada call Google untuk menghitung ongkir.
+- [ ] Pemilih titik memakai Google Map, CTA bawah tidak tertutup dan halaman tidak ikut scroll pada phone kecil.
+- [ ] Ada tiga pilihan jelas: Pilih di peta, Cari nama tempat, dan Tempel link.
+- [ ] Pencarian dapat menemukan nama tempat dan memusatkan pin ke hasil pilihan.
+- [ ] Keyword yang hanya diketik tidak memicu ORS; hasil pencarian tidak disimpan/cache.
+- [ ] Input link dari WhatsApp yang memuat koordinat tidak memanggil Places API.
+- [ ] Key browser hanya dapat dipakai dari domain produksi dan hanya untuk dua API yang disetujui.
+- [ ] Budget alert aktif dan penggunaan uji 15 ongkir/hari berada di bawah free cap.
+- [ ] Atribusi Google tidak tertutup dan legal pages telah diaudit.
 
-- Implementasi adapter dan toggle hanya di preview.
-- Bandingkan Jalan kampung vs Jalan mobil untuk setiap titik uji; simpan hasil uji sebagai jarak/durasi/mode, bukan alamat pelanggan publik.
-- Pastikan kalkulasi D1, D2, garis peta, label, dan link Share menggunakan mode identik.
+## 11. Tutorial setup Google Maps paling hemat
 
-### Tahap 2 — Rilis terbatas
+1. Buka [Google Cloud Console](https://console.cloud.google.com/) dengan akun pemilik bisnis, lalu buat project `rayo-kurir-production`.
+2. Hubungkan **Billing account** dan metode pembayaran. Ini diperlukan walaupun targetnya tetap gratis.
+3. Di **APIs & Services → Library**, aktifkan hanya:
+   - **Maps JavaScript API**
+   - **Places API (New)**
+4. Jangan aktifkan Routes API, Geocoding API, Text Search, Nearby Search, atau Directions/Distance Matrix lama untuk fitur ini.
+5. Di **APIs & Services → Credentials**, buat satu API key bernama `rayo-kurir-web-maps-production`.
+6. Pilih **Application restrictions → Websites**, lalu masukkan:
+   - `https://rayokurir.id/*`
+   - `https://www.rayokurir.id/*`
+   Tambahkan `http://localhost:3000/*` hanya sementara untuk development lokal, lalu hapus bila tidak dipakai.
+7. Pilih **API restrictions → Restrict key**, lalu izinkan hanya Maps JavaScript API dan Places API (New).
+8. Simpan nilainya sebagai `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY` di Vercel pada Preview dan Production. Jangan commit key ke Git.
+9. Di **Billing → Budgets & alerts**, buat budget US$5/bulan dengan alert 50%, 90%, dan 100%.
+10. Di **APIs & Services → Enabled APIs**, buka masing-masing API dan periksa Usage/Quotas setiap minggu pertama rilis.
+11. Uji production dengan 10–15 pencarian nama tempat dan beberapa link WhatsApp. Pastikan browser hanya memuat Maps JavaScript/Places, sedangkan `/api/route-distance` tetap menuju ORS.
 
-- Rilis dengan Jalan kampung sebagai default dan Mobil sebagai toggle fallback.
-- Pantau error, fallback, latency, serta pemakaian ORS setiap hari selama 7 hari.
-- Admin menandai kasus ketika hasil Jalan kampung tidak masuk akal untuk dilacak, tanpa mengubah tarif otomatis.
+## 12. Referensi resmi
 
-### Tahap 3 — Evaluasi
-
-- Evaluasi perbedaan estimasi vs perjalanan kurir serta pemakaian quota ORS.
-- Putuskan apakah mode Mobil tetap sebagai pilihan publik, menjadi opsi admin, atau seluruh routing dipindahkan ke satu provider pada fase berikutnya.
-
-### Kriteria penerimaan
-
-- [ ] Toggle terlihat dan dapat dioperasikan keyboard/screen reader di desktop dan mobile.
-- [ ] Default dan share URL memulihkan `route_mode` dengan benar.
-- [ ] Jalan kampung memakai `cycling-regular`; Mobil tetap `driving-car`.
-- [ ] Dua kaki ongkir dan polyline peta tidak bercampur profil.
-- [ ] Beralih mode memperbarui kilometer, waktu, rincian harga, dan label tanpa hasil stale.
-- [ ] Fallback selalu terlihat jelas dan tidak menyamar sebagai jalur kampung.
-- [ ] Cache mengisolasi mode/provider dan log tidak memuat secret/koordinat mentah.
-- [ ] Seluruh 10–15 rute uji lulus review kurir, khususnya rute jalan pintas motor yang dilaporkan.
-- [ ] Tarif existing, Express, paket tes, lokasi picker, dan alur WhatsApp tetap berfungsi.
-
-## 11. Keputusan yang perlu disetujui sebelum coding
-
-1. Setujui default **Jalan kampung (estimasi)** dan opsi **Jalan mobil** sebagai toggle publik.
-2. Berikan 1–3 contoh titik/rute lokal yang menurut operasional seharusnya lebih dekat lewat motor, untuk dijadikan uji penerimaan nyata.
-3. Setujui teks disclaimer bahwa jalur kampung tetap estimasi dan harga/kelayakan akhir dikonfirmasi admin.
-
-## 12. Referensi
-
-- Dokumentasi ORS menawarkan profil mobil, sepeda, pejalan kaki, dan kendaraan berat; bukan profil sepeda motor khusus: https://openrouteservice.org/services/
-- Dokumentasi ORS tentang profil bersepeda menjelaskan bahwa `cycling-regular` adalah profil sepeda normal, sehingga penggunaan sebagai jalur kampung perlu selalu diberi label estimasi: https://ask.openrouteservice.org/t/trying-to-understand-the-difference-between-cycling-profiles/302
+- [Harga dan batas gratis Google Maps Platform](https://developers.google.com/maps/billing-and-pricing/pricing)
+- [Place Autocomplete widget baru](https://developers.google.com/maps/documentation/javascript/place-autocomplete-new)
+- [Autocompletion session dan field minimum](https://developers.google.com/maps/documentation/places/web-service/usage-and-billing)
+- [Kebijakan dan atribusi Google Maps Platform](https://developers.google.com/maps/documentation/routes/policies)

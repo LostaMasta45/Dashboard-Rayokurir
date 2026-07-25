@@ -29,6 +29,13 @@
     background-color: #f8fafc !important;
 }
 
+/* The fullscreen picker owns touch gestures so a map drag cannot scroll the
+   form behind it on phones. The confirmation dock sits outside this container. */
+.touch-none .leaflet-container {
+    touch-action: none;
+    overscroll-behavior: none;
+}
+
 /* Leaflet attribution styling */
 .leaflet-control-attribution {
     font-size: 10px !important;
