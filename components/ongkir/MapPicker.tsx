@@ -283,17 +283,17 @@ export function MapPicker({
 
                 if (response.ok) {
                     const data = await response.json()
-                    if (data.coordinates && data.coordinates.length > 0) {
+                    if (data.source === "ors" && Array.isArray(data.coordinates) && data.coordinates.length > 1) {
                         setRouteCoords(data.coordinates)
                     } else {
-                        setRouteCoords([[basecamp.lat, basecamp.lng], [pickup.lat, pickup.lng], [dropoff.lat, dropoff.lng]])
+                        setRouteCoords([])
                     }
                 } else {
-                    setRouteCoords([[basecamp.lat, basecamp.lng], [pickup.lat, pickup.lng], [dropoff.lat, dropoff.lng]])
+                    setRouteCoords([])
                 }
             } catch (error) {
                 console.error("Error fetching route geometry:", error)
-                setRouteCoords([[basecamp.lat, basecamp.lng], [pickup.lat, pickup.lng], [dropoff.lat, dropoff.lng]])
+                setRouteCoords([])
             } finally {
                 setIsLoadingRoute(false)
             }

@@ -191,7 +191,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                 routeMode,
                 fallbackNote: d1Data.fallback || d2Data.fallback
                     ? (d1Data.source === "haversine" || d2Data.source === "haversine"
-                        ? "Estimasi jarak sementara digunakan karena rute jalan tidak tersedia."
+                        ? "Rute jalan sementara tidak tersedia. Harga tetap dihitung sebagai estimasi; garis lurus tidak ditampilkan karena bukan jalur jalan."
                         : "Sebagian jalur kampung tidak tersedia, sehingga estimasi memakai rute mobil.")
                     : null
             })
@@ -216,7 +216,7 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                 d2DurationMinutes,
                 totalDurationMinutes: d1DurationMinutes + d2DurationMinutes,
                 routeMode,
-                fallbackNote: "Estimasi jarak sementara digunakan karena rute jalan tidak tersedia."
+                fallbackNote: "Rute jalan sementara tidak tersedia. Harga tetap dihitung sebagai estimasi; garis lurus tidak ditampilkan karena bukan jalur jalan."
             })
             setStatus("ready")
         } finally {

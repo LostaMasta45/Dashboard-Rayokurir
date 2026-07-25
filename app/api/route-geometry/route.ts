@@ -105,7 +105,9 @@ function getStraightRoute(waypoints: Coordinate[], requestedMode: RouteMode): Ro
     }
 
     return {
-        coordinates: waypoints.map(({ lat, lng }) => [lat, lng]),
+        // Never return waypoint-to-waypoint straight lines as route geometry.
+        // They cut across buildings/fields and can be mistaken for a road.
+        coordinates: [],
         distance_m: Math.round(distance * 1.3),
         duration_s: Math.round((distance / 1000 / 30) * 3600 * 1.3),
         source: "straight",
