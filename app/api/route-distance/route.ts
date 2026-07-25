@@ -17,7 +17,7 @@ interface RouteRequest {
 interface RouteResponse {
     distance_m: number
     duration_s: number
-    source: "ors" | "haversine"
+    source: "ors" | "osrm" | "haversine"
     route_mode: RouteMode
     requested_mode: RouteMode
     fallback: boolean
@@ -25,8 +25,9 @@ interface RouteResponse {
 
 const cache = new Map<string, { data: RouteResponse; timestamp: number }>()
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000
-const CACHE_VERSION = "v6"
+const CACHE_VERSION = "v7"
 const ORS_TIMEOUT_MS = 5_000
+const OSRM_TIMEOUT_MS = 4_000
 
 function isCoordinate(value: unknown): value is Coordinate {
     if (!value || typeof value !== "object") return false
@@ -108,6 +109,46 @@ async function getOrsRoute(from: Coordinate, to: Coordinate, mode: RouteMode) {
     }
 }
 
+async function getOsrmRoute(from: Coordinate, to: Coordinate) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), OSRM_TIMEOUT_MS)
+
+    try {
+        const coordinates = `${from.lng},${from.lat};${to.lng},${to.lat}`
+        const url = new URL(`https://router.project-osrm.org/route/v1/driving/${coordinates}`)
+        url.searchParams.set("overview", "false")
+        url.searchParams.set("steps", "false")
+
+        const response = await fetch(url, {
+            headers: { Accept: "application/json" },
+            cache: "no-store",
+            signal: controller.signal,
+        })
+
+        if (!response.ok) {
+            console.warn("OSRM distance request failed", { status: response.status })
+            return null
+        }
+
+        const data = await response.json()
+        const route = data.code === "Ok" ? data.routes?.[0] : null
+        if (!route || !Number.isFinite(route.distance) || !Number.isFinite(route.duration)) {
+            console.warn("OSRM distance response was incomplete")
+            return null
+        }
+
+        return {
+            distance_m: Math.round(route.distance),
+            duration_s: Math.round(route.duration),
+        }
+    } catch {
+        console.warn("OSRM distance request raised an exception")
+        return null
+    } finally {
+        clearTimeout(timeoutId)
+    }
+}
+
 export async function POST(request: NextRequest) {
     try {
         const body: RouteRequest = await request.json()
@@ -135,14 +176,14 @@ export async function POST(request: NextRequest) {
                 requested_mode: requestedMode,
                 fallback: false,
             }
-        } else if (requestedMode === "kampung") {
-            const carRoute = await getOrsRoute(from, to, "car")
-            if (carRoute) {
+        } else {
+            const osrmRoute = await getOsrmRoute(from, to)
+            if (osrmRoute) {
                 result = {
-                    ...carRoute,
-                    source: "ors",
+                    ...osrmRoute,
+                    source: "osrm",
                     route_mode: "car",
-                    requested_mode: "kampung",
+                    requested_mode: requestedMode,
                     fallback: true,
                 }
             } else {
@@ -151,20 +192,10 @@ export async function POST(request: NextRequest) {
                     distance_m: Math.round(straightDistance * 1.3),
                     duration_s: Math.round((straightDistance / 1000 / 30) * 3600 * 1.3),
                     source: "haversine",
-                    route_mode: "kampung",
-                    requested_mode: "kampung",
+                    route_mode: requestedMode,
+                    requested_mode: requestedMode,
                     fallback: true,
                 }
-            }
-        } else {
-            const straightDistance = haversineDistance(from, to)
-            result = {
-                distance_m: Math.round(straightDistance * 1.3),
-                duration_s: Math.round((straightDistance / 1000 / 30) * 3600 * 1.3),
-                source: "haversine",
-                route_mode: "car",
-                requested_mode: "car",
-                fallback: true,
             }
         }
 

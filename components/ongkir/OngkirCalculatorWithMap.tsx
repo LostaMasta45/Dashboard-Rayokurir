@@ -192,7 +192,9 @@ export function OngkirCalculatorWithMap({ className = "", compact = false }: Ong
                 fallbackNote: d1Data.fallback || d2Data.fallback
                     ? (d1Data.source === "haversine" || d2Data.source === "haversine"
                         ? "Rute jalan sementara tidak tersedia. Harga tetap dihitung sebagai estimasi; garis lurus tidak ditampilkan karena bukan jalur jalan."
-                        : "Sebagian jalur kampung tidak tersedia, sehingga estimasi memakai rute mobil.")
+                        : (d1Data.source === "osrm" || d2Data.source === "osrm"
+                            ? "ORS sementara tidak tersedia; estimasi memakai rute jalan OpenStreetMap."
+                            : "Sebagian jalur kampung tidak tersedia, sehingga estimasi memakai rute mobil."))
                     : null
             })
             setStatus("ready")

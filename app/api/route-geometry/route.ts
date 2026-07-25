@@ -17,7 +17,7 @@ interface RouteGeometryResponse {
     coordinates: Array<[number, number]>
     distance_m: number
     duration_s: number
-    source: "ors" | "straight"
+    source: "ors" | "osrm" | "straight"
     route_mode: RouteMode
     requested_mode: RouteMode
     fallback: boolean
@@ -25,8 +25,9 @@ interface RouteGeometryResponse {
 
 const cache = new Map<string, { data: RouteGeometryResponse; timestamp: number }>()
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000
-const CACHE_VERSION = "v6"
+const CACHE_VERSION = "v7"
 const ORS_TIMEOUT_MS = 7_000
+const OSRM_TIMEOUT_MS = 4_000
 
 function isCoordinate(value: unknown): value is Coordinate {
     if (!value || typeof value !== "object") return false
@@ -98,6 +99,55 @@ async function getOrsGeometry(waypoints: Coordinate[], mode: RouteMode) {
     }
 }
 
+async function getOsrmGeometry(waypoints: Coordinate[]) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), OSRM_TIMEOUT_MS)
+
+    try {
+        const coordinates = waypoints.map(({ lat, lng }) => `${lng},${lat}`).join(";")
+        const url = new URL(`https://router.project-osrm.org/route/v1/driving/${coordinates}`)
+        url.searchParams.set("overview", "full")
+        url.searchParams.set("geometries", "geojson")
+        url.searchParams.set("steps", "false")
+
+        const response = await fetch(url, {
+            headers: { Accept: "application/json" },
+            cache: "no-store",
+            signal: controller.signal,
+        })
+
+        if (!response.ok) {
+            console.warn("OSRM geometry request failed", { status: response.status })
+            return null
+        }
+
+        const data = await response.json()
+        const route = data.code === "Ok" ? data.routes?.[0] : null
+        const geometry = route?.geometry?.coordinates
+        if (
+            !route ||
+            !Array.isArray(geometry) ||
+            geometry.length < 2 ||
+            !Number.isFinite(route.distance) ||
+            !Number.isFinite(route.duration)
+        ) {
+            console.warn("OSRM geometry response was incomplete")
+            return null
+        }
+
+        return {
+            coordinates: geometry.map(([lng, lat]: [number, number]) => [lat, lng] as [number, number]),
+            distance_m: Math.round(route.distance),
+            duration_s: Math.round(route.duration),
+        }
+    } catch {
+        console.warn("OSRM geometry request raised an exception")
+        return null
+    } finally {
+        clearTimeout(timeoutId)
+    }
+}
+
 function getStraightRoute(waypoints: Coordinate[], requestedMode: RouteMode): RouteGeometryResponse {
     let distance = 0
     for (let index = 0; index < waypoints.length - 1; index += 1) {
@@ -142,19 +192,17 @@ export async function POST(request: NextRequest) {
                 requested_mode: requestedMode,
                 fallback: false,
             }
-        } else if (requestedMode === "kampung") {
-            const carRoute = await getOrsGeometry(body.waypoints, "car")
-            result = carRoute
+        } else {
+            const osrmRoute = await getOsrmGeometry(body.waypoints)
+            result = osrmRoute
                 ? {
-                    ...carRoute,
-                    source: "ors",
+                    ...osrmRoute,
+                    source: "osrm",
                     route_mode: "car",
-                    requested_mode: "kampung",
+                    requested_mode: requestedMode,
                     fallback: true,
                 }
-                : getStraightRoute(body.waypoints, "kampung")
-        } else {
-            result = getStraightRoute(body.waypoints, "car")
+                : getStraightRoute(body.waypoints, requestedMode)
         }
 
         cache.set(cacheKey, { data: result, timestamp: Date.now() })

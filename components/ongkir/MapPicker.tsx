@@ -283,7 +283,11 @@ export function MapPicker({
 
                 if (response.ok) {
                     const data = await response.json()
-                    if (data.source === "ors" && Array.isArray(data.coordinates) && data.coordinates.length > 1) {
+                    if (
+                        (data.source === "ors" || data.source === "osrm") &&
+                        Array.isArray(data.coordinates) &&
+                        data.coordinates.length > 1
+                    ) {
                         setRouteCoords(data.coordinates)
                     } else {
                         setRouteCoords([])
